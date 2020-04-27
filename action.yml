@@ -4,7 +4,7 @@ author: 'Sophia Guo'
 inputs:
   version:              # change this
     description: 'openjdk version'
-    default: '14'
+    default: '14u'
 outputs:
   BuildHotspotJDK: # build jdk images directory
 runs:

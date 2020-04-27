@@ -34,7 +34,7 @@ export async function buildJDK(
   await exec.exec('printenv')
   process.chdir('openjdk-build')
   const CONFIG_ARGS = '--with-debug-level=slowdebug --disable-ccache --disable-warnings-as-errors'
-  await exec.exec(`makejdk-any-platform.sh \
+  await exec.exec(`./makejdk-any-platform.sh \
     --adoptopenjdk-build-repo ${ADOPT_OPENJDK_BUILD_REPO_URI} \
     -J ${workDir}/JDK_BOOT_DIR \
   --disable-shallow-git-clone \
