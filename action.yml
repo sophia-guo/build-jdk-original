@@ -1,0 +1,12 @@
+name: 'build-jdk-hotspot'
+description: 'Build different version of openjdk with hotspot'
+author: 'Sophia Guo'
+inputs:
+  version:              # change this
+    description: 'openjdk version'
+    default: '14'
+outputs:
+  BuildHotspotJDK: # build jdk images directory
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
