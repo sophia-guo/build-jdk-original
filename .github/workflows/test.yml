@@ -5,20 +5,10 @@ on: # rebuild any PRs and main branch changes
 
 jobs:
   build:
-    runs-on: ubuntu-16.04
+    runs-on: macos-10.15
     steps:
     - uses: actions/checkout@v1
     - uses: ./
       id: buildHotspot
       with: 
-        version: 14
-      env:
-        BUILD_PLATFORMS: 'Linux'
-        linuxBootJDKUri: 'TODO:linuxBootJDKUri'
-    - uses: actions/upload-artifact@v2-preview
-      if: failure()
-      with:
-        name: configure_output
-        path: ./**/config.log
-
-# Test version 8: https://github.com/sophia-guo/build-jdk-openj9/runs/603106058?check_suite_focus=true
+        javaToBuild: 'jdk11u'
