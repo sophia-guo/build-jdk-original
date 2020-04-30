@@ -1,4 +1,4 @@
-name: "build-jdk-hotspot"
+name: "build-jdk-openj9 with adoptopenjdk openjdk-build"
 on: # rebuild any PRs and main branch changes
   pull_request:
   push:
@@ -9,6 +9,11 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - uses: ./
-      id: buildHotspot
+      id: buildOpenj9
       with: 
         javaToBuild: 'jdk11u'
+    - run: ${{ steps.buildOpenj9.outputs.BuildOpenJ9JDK }}/Contents/Home/bin/java -version
+    - uses: actions/upload-artifact@v2-preview
+      with:
+        name: JDK
+        path: ./**/artifacts/*.tar.gz/

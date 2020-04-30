@@ -3176,15 +3176,15 @@ const core = __importStar(__webpack_require__(470));
 const tc = __importStar(__webpack_require__(533));
 const io = __importStar(__webpack_require__(1));
 const workDir = process.env['GITHUB_WORKSPACE'];
-const dependenciesDir = `${workDir}/tmp`;
+//const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`;
-const javaHomeDir = `${workDir}/jdk/home`;
-function buildJDK(javaToBuild, targetOs, architecture) {
+//const javaHomeDir = `${workDir}/jdk/home`
+function buildJDK(javaToBuild, targetOs, architecture, impl) {
     return __awaiter(this, void 0, void 0, function* () {
         //set parameters and environment
         yield exec.exec(`git clone https://github.com/AdoptOpenJDK/openjdk-build.git`);
         const time = new Date().toISOString().split('T')[0];
-        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_hotspot_${time}`;
+        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`;
         yield io.mkdirP('jdk');
         process.chdir('jdk');
         yield io.mkdirP('boot');
@@ -3194,7 +3194,9 @@ function buildJDK(javaToBuild, targetOs, architecture) {
             yield exec.exec('brew install autoconf ccache coreutils');
         }
         const bootJDKVersion = getBootJdkVersion(javaToBuild);
-        const bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v2/binary/releases/openjdk${bootJDKVersion}?openjdk_impl=hotspot&os=${targetOs}&arch=${architecture}&release=latest&heap_size=normal&type=jdk`);
+        // should be updated to apiv3. Though looks like mac-openj9-10 doesn't work, leave as is for now.
+        // const bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootjdkVersion}/ga/${targetOs}/${architecture}/jdk/${impl}/normal/adoptopenjdk`)
+        const bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v2/binary/releases/openjdk${bootJDKVersion}?openjdk_impl=${impl}&os=${targetOs}&arch=${architecture}&release=latest&heap_size=normal&type=jdk`);
         yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
         yield io.rmRF(`${bootjdkJar}`);
         const jdk8Jar = yield tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot');
@@ -3211,9 +3213,24 @@ function buildJDK(javaToBuild, targetOs, architecture) {
   -d artifacts \
   --target-file-name ${fileName}.tar.gz  \
   --use-jep319-certs \
-  --build-variant hotspot \
+  --build-variant ${impl} \
   --disable-adopt-branch-safety \
   ${javaToBuild}`);
+        let platform = 'macosx-x86_64-normal-server-release';
+        if ((parseInt(bootJDKVersion) + 1).toString() === '14')
+            platform = 'macosx-x86_64-server-release'; // TODO: this looks like a error in the README of Eclipse Openj9
+        let jdkImages;
+        if (javaToBuild === 'jdk8u') {
+            jdkImages = `workspace/build/src/build/${platform}/images/j2sdk-image`;
+            process.chdir(`${jdkImages}/jre/bin`);
+        }
+        else {
+            jdkImages = `workspace/build/src/build/${platform}/images/jdk`;
+            process.chdir(`${jdkImages}/bin`);
+        }
+        yield exec.exec(`./java -version`);
+        core.setOutput(`Build${impl}JDK`, `${workDir}/openjdk-build/workspace/build/src/${jdkImages}`);
+        process.chdir(`${workDir}`);
         yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
     });
 }
@@ -3772,13 +3789,16 @@ function run() {
             let javaToBuild = core.getInput('javaToBuild', { required: false });
             let targetOs = core.getInput('targetOs', { required: false });
             let architecture = core.getInput('architecture', { required: false });
+            let impl = core.getInput('impl', { required: false });
             if (!javaToBuild)
                 javaToBuild = 'jdk11u';
             if (!targetOs)
                 targetOs = 'mac';
             if (!architecture)
                 architecture = 'x64';
-            yield builder.buildJDK(javaToBuild, targetOs, architecture);
+            if (!impl)
+                impl = 'hotspot';
+            yield builder.buildJDK(javaToBuild, targetOs, architecture, impl);
         }
         catch (error) {
             core.setFailed(error.message);

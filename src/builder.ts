@@ -5,20 +5,21 @@ import * as io from '@actions/io'
 import { EXDEV } from 'constants'
 
 const workDir = process.env['GITHUB_WORKSPACE']
-const dependenciesDir =  `${workDir}/tmp`
+//const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`
-const javaHomeDir = `${workDir}/jdk/home`
+//const javaHomeDir = `${workDir}/jdk/home`
 
 export async function buildJDK(
   javaToBuild: string,
   targetOs: string,
-  architecture: string
+  architecture: string,
+  impl: string
 ): Promise<void> {
 
   //set parameters and environment
   await exec.exec(`git clone https://github.com/AdoptOpenJDK/openjdk-build.git`)
   const time = new Date().toISOString().split('T')[0]
-  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_hotspot_${time}`
+  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`
   
   await io.mkdirP('jdk')
   process.chdir('jdk')
@@ -32,7 +33,9 @@ export async function buildJDK(
   }
   
   const bootJDKVersion = getBootJdkVersion(javaToBuild)
-  const bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v2/binary/releases/openjdk${bootJDKVersion}?openjdk_impl=hotspot&os=${targetOs}&arch=${architecture}&release=latest&heap_size=normal&type=jdk`)
+  // should be updated to apiv3. Though looks like mac-openj9-10 doesn't work, leave as is for now.
+  // const bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootjdkVersion}/ga/${targetOs}/${architecture}/jdk/${impl}/normal/adoptopenjdk`)
+  const bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v2/binary/releases/openjdk${bootJDKVersion}?openjdk_impl=${impl}&os=${targetOs}&arch=${architecture}&release=latest&heap_size=normal&type=jdk`)
   await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
   await io.rmRF(`${bootjdkJar}`)
   const jdk8Jar = await tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot')
@@ -49,10 +52,23 @@ export async function buildJDK(
   -d artifacts \
   --target-file-name ${fileName}.tar.gz  \
   --use-jep319-certs \
-  --build-variant hotspot \
+  --build-variant ${impl} \
   --disable-adopt-branch-safety \
   ${javaToBuild}`)
- 
+
+  let platform = 'macosx-x86_64-normal-server-release'
+  if ((parseInt(bootJDKVersion) + 1).toString() === '14') platform = 'macosx-x86_64-server-release' // TODO: this looks like a error in the README of Eclipse Openj9
+  let jdkImages
+  if (javaToBuild === 'jdk8u') {
+    jdkImages = `workspace/build/src/build/${platform}/images/j2sdk-image`
+    process.chdir(`${jdkImages}/jre/bin`)
+  } else {
+    jdkImages = `workspace/build/src/build/${platform}/images/jdk`
+    process.chdir(`${jdkImages}/bin`)
+  }
+  await exec.exec(`./java -version`)
+  core.setOutput(`Build${impl}JDK`, `${workDir}/openjdk-build/workspace/build/src/${jdkImages}`)
+  process.chdir(`${workDir}`)
   await exec.exec(`find ./ -name ${fileName}.tar.gz`)
 }
 
