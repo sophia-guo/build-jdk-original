@@ -3234,6 +3234,36 @@ function installDependencies(javaToBuild, impl) {
                 yield exec.exec('brew install bash nasm');
             }
         }
+        else if (`${targetOs}` === 'linux') {
+            yield exec.exec(`sudo apt-get update`);
+            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
+      autoconf \
+      ccache \
+      cpio \
+      git-core \
+      libasound2-dev \
+      libcups2-dev \
+      libdwarf-dev \
+      libelf-dev \
+      libfontconfig1-dev \
+      libfreetype6-dev \
+      libnuma-dev \
+      libx11-dev \
+      libxext-dev \
+      libxrender-dev \
+      libxt-dev \
+      libxtst-dev \
+      make \
+      nasm \
+      pkg-config \
+      realpath \
+      ssh \
+      libnuma-dev \
+      numactl \
+      gcc-7 \
+      g++-7 \
+      gcc-multilib');
+        }
         // other installation, i.e impl
     });
 }
@@ -3249,7 +3279,12 @@ function getBootJdk(javaToBuild, impl) {
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
-            yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            if (`${targetOs}` === 'mac') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            }
+            else {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
+            }
             yield io.rmRF(`${bootjdkJar}`);
             core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); //# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
             core.addPath(`${workDir}/jdk/boot/bin`);
@@ -3294,7 +3329,7 @@ function printJavaVersion(javaToBuild) {
         else {
             let version = javaToBuild.replace('jdk', '');
             version = version.substr(0, version.length - 1);
-            if (parseInt(version) >= 14)
+            if (parseInt(version) >= 13)
                 platformRelease = `${platform}-x86_64-server-release`;
         }
         let jdkImages;

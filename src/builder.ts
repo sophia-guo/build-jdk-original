@@ -71,6 +71,37 @@ async function installDependencies(javaToBuild: string, impl: string): Promise<v
     if (`${impl}` === 'openj9') {
       await exec.exec('brew install bash nasm')
     }
+  } else if (`${targetOs}` === 'linux') {
+    await exec.exec(`sudo apt-get update`)
+    await exec.exec(
+      'sudo apt-get install -qq -y --no-install-recommends \
+      autoconf \
+      ccache \
+      cpio \
+      git-core \
+      libasound2-dev \
+      libcups2-dev \
+      libdwarf-dev \
+      libelf-dev \
+      libfontconfig1-dev \
+      libfreetype6-dev \
+      libnuma-dev \
+      libx11-dev \
+      libxext-dev \
+      libxrender-dev \
+      libxt-dev \
+      libxtst-dev \
+      make \
+      nasm \
+      pkg-config \
+      realpath \
+      ssh \
+      libnuma-dev \
+      numactl \
+      gcc-7 \
+      g++-7 \
+      gcc-multilib'
+    )
   }
   // other installation, i.e impl
 }
@@ -86,7 +117,12 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
     } else {
       bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     }
-    await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
+
+    if (`${targetOs}` === 'mac') {
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
+    } else {
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
+    }
     await io.rmRF(`${bootjdkJar}`)
     core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`)//# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
     core.addPath(`${workDir}/jdk/boot/bin`)
@@ -128,7 +164,7 @@ async function printJavaVersion(javaToBuild: string): Promise<void> {
   } else {
     let version = javaToBuild.replace('jdk', '')
     version = version.substr(0, version.length - 1)
-    if (parseInt(version) >= 14) platformRelease = `${platform}-x86_64-server-release` 
+    if (parseInt(version) >= 13) platformRelease = `${platform}-x86_64-server-release` 
   }
   let jdkImages
   if (javaToBuild === 'jdk8u') {
