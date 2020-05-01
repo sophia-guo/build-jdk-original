@@ -4,17 +4,18 @@ on: # rebuild any PRs and main branch changes
   push:
     branches-ignore:
       - '**'
+
 jobs:
   build:
     runs-on: macos-10.15
     steps:
     - uses: actions/checkout@v1
     - uses: ./
-      id: buildJDK
+      id: buildOpenj9
       with: 
-        javaToBuild: 'jdk14u'
-    - run: ${{ steps.buildJDK.outputs.BuildJDKDir }}/bin/java -version
+        javaToBuild: 'jdk11u'
+    - run: ${{ steps.buildOpenj9.outputs.BuildJDKDir }}/bin/java -version
     - uses: actions/upload-artifact@v2-preview
       with:
-        name: buildJDK
+        name: JDK
         path: ./**/artifacts/*.tar.gz/

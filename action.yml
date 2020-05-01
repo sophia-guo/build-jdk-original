@@ -1,12 +1,19 @@
-name: 'build-jdk-hotspot'
-description: 'Build different version of openjdk with hotspot'
+name: 'build-jdk'
+description: 'Build different version of openjdk from AdoptOpenJDK community'
 author: 'Sophia Guo'
 inputs:
-  version:              # change this
+  javaToBuild:
     description: 'openjdk version'
-    default: 'jdk11u'
+    default: 'jdk11u'     ## jdk8u cannot be built on macOS 10.14 or 10.13
+  architecture:
+    default: 'x64'
+  impl:
+    default: 'hotspot'
+  usePRRef:
+    description: 'A boolean value ("true" or "false") on whether using default openjdk-build repo or PR repo.'
+    required: false
 outputs:
-  BuildHotspotJDK: # build jdk images directory
+  BuildJDKDir: # build jdk images directory
 runs:
   using: 'node12'
   main: 'dist/index.js'
