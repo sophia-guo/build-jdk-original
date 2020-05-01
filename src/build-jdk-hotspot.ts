@@ -3,15 +3,11 @@ import * as builder from './builder'
 
 async function run(): Promise<void> {
   try {
-    let javaToBuild = core.getInput('javaToBuild', {required: false})
-    let targetOs = core.getInput('targetOs', {required: false})
-    let architecture = core.getInput('architecture', {required: false})
-    let impl = core.getInput('impl', {required: false})
-    if (!javaToBuild) javaToBuild = 'jdk11u'
-    if (!targetOs) targetOs = 'mac'
-    if (!architecture) architecture = 'x64'
-    if (!impl) impl = 'hotspot'
-    await builder.buildJDK(javaToBuild, targetOs, architecture, impl)
+    const javaToBuild = core.getInput('javaToBuild', {required: false})
+    const architecture = core.getInput('architecture', {required: false})
+    const impl = core.getInput('impl', {required: false})
+    const usePRRef = core.getInput('usePRRef') === 'true'
+    await builder.buildJDK(javaToBuild, architecture, impl, usePRRef)
   } catch (error) {
     core.setFailed(error.message)
   }

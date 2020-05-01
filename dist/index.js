@@ -3179,10 +3179,14 @@ const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`;
 //const javaHomeDir = `${workDir}/jdk/home`
-function buildJDK(javaToBuild, targetOs, architecture, impl) {
+let buildDir = workDir;
+const IS_WINDOWS = process.platform === "win32";
+const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
+function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
+        yield getOpenjdkBuildResource(usePRRef);
+        core.info(`build Dir is ${buildDir}`);
         //set parameters and environment
-        yield exec.exec(`git clone https://github.com/AdoptOpenJDK/openjdk-build.git`);
         const time = new Date().toISOString().split('T')[0];
         const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`;
         yield io.mkdirP('jdk');
@@ -3190,22 +3194,12 @@ function buildJDK(javaToBuild, targetOs, architecture, impl) {
         yield io.mkdirP('boot');
         yield io.mkdirP('home');
         process.chdir(`${workDir}`);
-        if (process.platform === 'darwin') {
-            yield exec.exec('brew install autoconf ccache coreutils');
-        }
-        const bootJDKVersion = getBootJdkVersion(javaToBuild);
-        // should be updated to apiv3. Though looks like mac-openj9-10 doesn't work, leave as is for now.
-        // const bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootjdkVersion}/ga/${targetOs}/${architecture}/jdk/${impl}/normal/adoptopenjdk`)
-        const bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v2/binary/releases/openjdk${bootJDKVersion}?openjdk_impl=${impl}&os=${targetOs}&arch=${architecture}&release=latest&heap_size=normal&type=jdk`);
-        yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
-        yield io.rmRF(`${bootjdkJar}`);
-        const jdk8Jar = yield tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot');
-        yield exec.exec(`sudo tar -xzf ${jdk8Jar} -C ./jdk/home --strip=3`);
-        yield io.rmRF(`${jdk8Jar}`);
-        core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); //# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-        core.addPath(`${workDir}/jdk/boot/bin`);
-        process.chdir('openjdk-build');
-        //const CONFIG_ARGS = "--disable-ccache --disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'"
+        //pre-install dependencies
+        yield installDependencies(javaToBuild, impl);
+        yield getBootJdk(javaToBuild, impl);
+        //got to build Dir
+        process.chdir(`${buildDir}`);
+        //build
         yield exec.exec(`./makejdk-any-platform.sh \
   -J ${jdkBootDir} \
   --disable-shallow-git-clone \
@@ -3216,37 +3210,106 @@ function buildJDK(javaToBuild, targetOs, architecture, impl) {
   --build-variant ${impl} \
   --disable-adopt-branch-safety \
   ${javaToBuild}`);
-        let platform = 'macosx-x86_64-normal-server-release';
-        if ((parseInt(bootJDKVersion) + 1).toString() === '14')
-            platform = 'macosx-x86_64-server-release'; // TODO: this looks like a error in the README of Eclipse Openj9
-        let jdkImages;
-        if (javaToBuild === 'jdk8u') {
-            jdkImages = `workspace/build/src/build/${platform}/images/j2sdk-image`;
-            process.chdir(`${jdkImages}/jre/bin`);
-        }
-        else {
-            jdkImages = `workspace/build/src/build/${platform}/images/jdk`;
-            process.chdir(`${jdkImages}/bin`);
-        }
-        yield exec.exec(`./java -version`);
-        core.setOutput(`Build${impl}JDK`, `${workDir}/openjdk-build/workspace/build/src/${jdkImages}`);
+        printJavaVersion(javaToBuild);
         process.chdir(`${workDir}`);
         yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
     });
 }
 exports.buildJDK = buildJDK;
+function getOpenjdkBuildResource(usePPRef) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!usePPRef) {
+            yield exec.exec(`git clone --depth 1 https://github.com/AdoptOpenJDK/openjdk-build.git`);
+            buildDir = `${workDir}/openjdk-build`;
+        }
+    });
+}
+function installDependencies(javaToBuild, impl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        /* install common dependencies place holder */
+        // install based on OS
+        if (`${targetOs}` === 'mac') {
+            yield exec.exec('brew install autoconf ccache coreutils');
+            if (`${impl}` === 'openj9') {
+                yield exec.exec('brew install bash nasm');
+            }
+        }
+        // other installation, i.e impl
+    });
+}
+function getBootJdk(javaToBuild, impl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const bootJDKVersion = getBootJdkVersion(javaToBuild);
+        if (parseInt(bootJDKVersion) > 8) {
+            let bootjdkJar;
+            // TODO: issue open openj9,mac, 10 ga : https://api.adoptopenjdk.net/v3/binary/latest/10/ga/mac/x64/jdk/openj9/normal/adoptopenjdk doesn't work
+            if (`${impl}` === 'openj9' && `${bootJDKVersion}` === '10' && `${targetOs} === 'mac'`) {
+                bootjdkJar = yield tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`);
+            }
+            else {
+                bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
+            }
+            yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            yield io.rmRF(`${bootjdkJar}`);
+            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); //# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
+            core.addPath(`${workDir}/jdk/boot/bin`);
+        }
+        else {
+            //TODO : need to update
+            const jdk8Jar = yield tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot');
+            yield exec.exec(`sudo tar -xzf ${jdk8Jar} -C ./jdk/home --strip=3`);
+            yield io.rmRF(`${jdk8Jar}`);
+        }
+    });
+}
 function getBootJdkVersion(javaToBuild) {
-    let bootJDKVersion = '';
-    if (`${javaToBuild}` === 'jdk11u') {
-        bootJDKVersion = '10';
-    }
-    else if (`${javaToBuild}` === 'jdk14u') {
-        bootJDKVersion = '13';
+    let bootJDKVersion;
+    //latest jdk need update continually
+    if (`${javaToBuild}` === 'jdk') {
+        bootJDKVersion = '14';
     }
     else {
-        core.error('not supported jdk version');
+        bootJDKVersion = javaToBuild.replace('jdk', '');
+        bootJDKVersion = bootJDKVersion.substr(0, bootJDKVersion.length - 1);
+        bootJDKVersion = (parseInt(bootJDKVersion) - 1).toString();
     }
     return bootJDKVersion;
+}
+function printJavaVersion(javaToBuild) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let platform;
+        if (`${targetOs}` === 'linux') {
+            platform = 'linux';
+        }
+        else if (`${targetOs}` === 'mac') {
+            platform = 'macosx';
+        }
+        else {
+            platform = 'windows';
+        }
+        let platformRelease = `${platform}-x86_64-normal-server-release`;
+        if (`${javaToBuild}` === 'jdk') {
+            platformRelease = `${platform}-x86_64-server-release`;
+        }
+        else {
+            let version = javaToBuild.replace('jdk', '');
+            version = version.substr(0, version.length - 1);
+            if (parseInt(version) >= 14)
+                platformRelease = `${platform}-x86_64-server-release`;
+        }
+        let jdkImages;
+        if (javaToBuild === 'jdk8u') {
+            jdkImages = `workspace/build/src/build/${platformRelease}/images/j2sdk-image`;
+            process.chdir(`${jdkImages}/jre/bin`);
+        }
+        else {
+            jdkImages = `workspace/build/src/build/${platformRelease}/images/jdk`;
+            process.chdir(`${jdkImages}/bin`);
+        }
+        yield exec.exec(`./java -version`);
+        //set outputs
+        core.setOutput('BuildJDKDir', `${buildDir}/${jdkImages}`);
+    });
 }
 
 
@@ -3786,19 +3849,11 @@ const builder = __importStar(__webpack_require__(532));
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            let javaToBuild = core.getInput('javaToBuild', { required: false });
-            let targetOs = core.getInput('targetOs', { required: false });
-            let architecture = core.getInput('architecture', { required: false });
-            let impl = core.getInput('impl', { required: false });
-            if (!javaToBuild)
-                javaToBuild = 'jdk11u';
-            if (!targetOs)
-                targetOs = 'mac';
-            if (!architecture)
-                architecture = 'x64';
-            if (!impl)
-                impl = 'hotspot';
-            yield builder.buildJDK(javaToBuild, targetOs, architecture, impl);
+            const javaToBuild = core.getInput('javaToBuild', { required: false });
+            const architecture = core.getInput('architecture', { required: false });
+            const impl = core.getInput('impl', { required: false });
+            const usePRRef = core.getInput('usePRRef') === 'true';
+            yield builder.buildJDK(javaToBuild, architecture, impl, usePRRef);
         }
         catch (error) {
             core.setFailed(error.message);
