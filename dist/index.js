@@ -3281,12 +3281,15 @@ function getBootJdk(javaToBuild, impl) {
         if (parseInt(bootJDKVersion) > 8) {
             let bootjdkJar;
             // TODO: issue open openj9,mac, 10 ga : https://api.adoptopenjdk.net/v3/binary/latest/10/ga/mac/x64/jdk/openj9/normal/adoptopenjdk doesn't work
-            if (`${impl}` === 'openj9' && `${bootJDKVersion}` === '10' && `${targetOs} === 'mac'`) {
+            if (`${impl}` === 'openj9' &&
+                `${bootJDKVersion}` === '10' &&
+                `${targetOs}` === 'mac') {
                 bootjdkJar = yield tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`);
             }
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
+            exec.exec('ls');
             if (`${targetOs}` === 'mac') {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
             }
@@ -3294,7 +3297,7 @@ function getBootJdk(javaToBuild, impl) {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
             }
             yield io.rmRF(`${bootjdkJar}`);
-            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); //# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
+            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
             core.addPath(`${workDir}/jdk/boot/bin`);
         }
         else {
