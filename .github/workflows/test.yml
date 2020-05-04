@@ -1,6 +1,5 @@
 name: "build-jdk-openj9 with adoptopenjdk openjdk-build linux"
 on: # rebuild any PRs and main branch changes
-  pull_request:
   push:
 
 jobs:
