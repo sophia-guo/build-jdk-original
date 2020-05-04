@@ -3241,6 +3241,7 @@ function installDependencies(javaToBuild, impl) {
       ccache \
       cpio \
       git-core \
+      build-essential \
       libasound2-dev \
       libcups2-dev \
       libdwarf-dev \
@@ -3260,9 +3261,16 @@ function installDependencies(javaToBuild, impl) {
       ssh \
       libnuma-dev \
       numactl \
-      gcc-7 \
-      g++-7 \
       gcc-multilib');
+            process.chdir('/usr/local');
+            const gccBinary = yield tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`);
+            yield exec.exec(`ls -l ${gccBinary}`);
+            yield exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`);
+            yield io.rmRF(`${gccBinary}`);
+            yield exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`);
+            yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
+            yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
+            yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
         }
         // other installation, i.e impl
     });
