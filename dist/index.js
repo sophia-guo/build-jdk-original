@@ -3285,6 +3285,7 @@ function installDependencies(javaToBuild, impl) {
       libx11-dev \
       libxext-dev \
       libxrender-dev \
+      libxrandr-dev \
       libxt-dev \
       libxtst-dev \
       make \

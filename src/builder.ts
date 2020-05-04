@@ -120,6 +120,7 @@ async function installDependencies(javaToBuild: string, impl: string): Promise<v
       libx11-dev \
       libxext-dev \
       libxrender-dev \
+      libxrandr-dev \
       libxt-dev \
       libxtst-dev \
       make \
