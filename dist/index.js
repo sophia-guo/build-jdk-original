@@ -3207,16 +3207,42 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
-        yield exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
-  --disable-shallow-git-clone \
-  --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
-  -d artifacts \
-  --target-file-name ${fileName}.tar.gz  \
-  --use-jep319-certs \
-  --build-variant ${impl} \
-  --disable-adopt-branch-safety \
-  ${javaToBuild}`);
+        if (`${targetOs}` === 'mac') {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
+        else if (`${impl}` === 'hotspot') {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
+        else {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
         printJavaVersion(javaToBuild);
         process.chdir(`${workDir}`);
         yield exec.exec(`find ./ -name ${fileName}.tar.gz`);

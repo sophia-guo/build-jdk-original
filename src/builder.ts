@@ -45,17 +45,41 @@ export async function buildJDK(
   process.chdir(`${buildDir}`)
   
   //build
-  await exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
-  --disable-shallow-git-clone \
-  --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
-  -d artifacts \
-  --target-file-name ${fileName}.tar.gz  \
-  --use-jep319-certs \
-  --build-variant ${impl} \
-  --disable-adopt-branch-safety \
-  ${javaToBuild}`)
 
+  if (`${targetOs}` === 'mac') {
+    await exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`)
+  } else if (`${impl}` === 'hotspot'){
+    await exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`)
+  } else {
+    await exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`)
+  }
   printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
   await exec.exec(`find ./ -name ${fileName}.tar.gz`)
