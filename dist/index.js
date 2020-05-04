@@ -3279,6 +3279,7 @@ function installDependencies(javaToBuild, impl) {
             yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
             yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
         }
+        process.chdir(`${workDir}`);
         // other installation, i.e impl
     });
 }

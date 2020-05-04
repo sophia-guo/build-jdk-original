@@ -119,6 +119,7 @@ async function installDependencies(javaToBuild: string, impl: string): Promise<v
     await exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`)
     await exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`)
   }
+  process.chdir(`${workDir}`)
   // other installation, i.e impl
 }
 
