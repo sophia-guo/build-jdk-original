@@ -177,8 +177,8 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
     }
     await io.rmRF(`${bootjdkJar}`)
-    core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-    core.addPath(`${workDir}/jdk/boot/bin`)
+  //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
+  // core.addPath(`${workDir}/jdk/boot/bin`)
   } else {
     //TODO : need to update
     const jdk8Jar = await tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot')

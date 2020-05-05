@@ -3338,8 +3338,8 @@ function getBootJdk(javaToBuild, impl) {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
             }
             yield io.rmRF(`${bootjdkJar}`);
-            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-            core.addPath(`${workDir}/jdk/boot/bin`);
+            //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
+            // core.addPath(`${workDir}/jdk/boot/bin`)
         }
         else {
             //TODO : need to update
