@@ -3243,8 +3243,12 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     --disable-adopt-branch-safety \
     ${javaToBuild}`);
         }
+<<<<<<< Upstream, based on origin/master
         // TODO: update directory for ubuntu
         // await printJavaVersion(javaToBuild)
+=======
+        yield printJavaVersion(javaToBuild);
+>>>>>>> 8e8c25b remove bootjdk as javahome
         process.chdir(`${workDir}`);
         try {
             yield exec.exec(`find ./ -name ${fileName}.tar.gz`);

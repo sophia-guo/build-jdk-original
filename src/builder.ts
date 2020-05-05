@@ -80,6 +80,7 @@ export async function buildJDK(
     --disable-adopt-branch-safety \
     ${javaToBuild}`)
   }
+
   // TODO: update directory for ubuntu
   // await printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
