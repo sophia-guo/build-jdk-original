@@ -2,30 +2,29 @@ import * as exec from '@actions/exec'
 import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
-import { EXDEV } from 'constants'
-import * as path from "path"
+import * as path from 'path'
 
-let tempDirectory = process.env["RUNNER_TEMP"] || "";
+let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`
 //const javaHomeDir = `${workDir}/jdk/home`
 let buildDir = workDir as string
-const IS_WINDOWS = process.platform === "win32"
+const IS_WINDOWS = process.platform === 'win32'
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
 
 if (!tempDirectory) {
-  let baseLocation;
+  let baseLocation
 
   if (IS_WINDOWS) {
     // On windows use the USERPROFILE env variable
-    baseLocation = process.env["USERPROFILE"] || "C:\\";
-  } else if (process.platform === "darwin") {
-    baseLocation = "/Users"
+    baseLocation = process.env['USERPROFILE'] || 'C:\\'
+  } else if (process.platform === 'darwin') {
+    baseLocation = '/Users'
   } else {
-    baseLocation = "/home"
+    baseLocation = '/home'
   }
-  tempDirectory = path.join(baseLocation, "actions", "temp")
+  tempDirectory = path.join(baseLocation, 'actions', 'temp')
 }
 
 export async function buildJDK(
@@ -200,13 +199,6 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     }
 
-/*     await exec.exec('ls')
-    if (`${targetOs}` === 'mac') {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
-    } else {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
-    } */
-
     if (`${targetOs}` === 'mac') {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
     } else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
@@ -216,8 +208,6 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
     }
 
     await io.rmRF(`${bootjdkJar}`)
-  //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-  // core.addPath(`${workDir}/jdk/boot/bin`)
   } else {
     //TODO : need to update
     const jdk8Jar = await tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot')

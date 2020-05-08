@@ -3176,27 +3176,27 @@ const core = __importStar(__webpack_require__(470));
 const tc = __importStar(__webpack_require__(533));
 const io = __importStar(__webpack_require__(1));
 const path = __importStar(__webpack_require__(622));
-let tempDirectory = process.env["RUNNER_TEMP"] || "";
+let tempDirectory = process.env['RUNNER_TEMP'] || '';
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`;
 //const javaHomeDir = `${workDir}/jdk/home`
 let buildDir = workDir;
-const IS_WINDOWS = process.platform === "win32";
+const IS_WINDOWS = process.platform === 'win32';
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
 if (!tempDirectory) {
     let baseLocation;
     if (IS_WINDOWS) {
         // On windows use the USERPROFILE env variable
-        baseLocation = process.env["USERPROFILE"] || "C:\\";
+        baseLocation = process.env['USERPROFILE'] || 'C:\\';
     }
-    else if (process.platform === "darwin") {
-        baseLocation = "/Users";
+    else if (process.platform === 'darwin') {
+        baseLocation = '/Users';
     }
     else {
-        baseLocation = "/home";
+        baseLocation = '/home';
     }
-    tempDirectory = path.join(baseLocation, "actions", "temp");
+    tempDirectory = path.join(baseLocation, 'actions', 'temp');
 }
 function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -3358,12 +3358,6 @@ function getBootJdk(javaToBuild, impl) {
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
-            /*     await exec.exec('ls')
-                if (`${targetOs}` === 'mac') {
-                  await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
-                } else {
-                  await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
-                } */
             if (`${targetOs}` === 'mac') {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
             }
@@ -3374,8 +3368,6 @@ function getBootJdk(javaToBuild, impl) {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
             }
             yield io.rmRF(`${bootjdkJar}`);
-            //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-            // core.addPath(`${workDir}/jdk/boot/bin`)
         }
         else {
             //TODO : need to update
