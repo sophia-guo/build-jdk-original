@@ -2,15 +2,30 @@ import * as exec from '@actions/exec'
 import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
-import { EXDEV } from 'constants'
+import * as path from 'path'
 
+let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`
 //const javaHomeDir = `${workDir}/jdk/home`
 let buildDir = workDir as string
-const IS_WINDOWS = process.platform === "win32"
+const IS_WINDOWS = process.platform === 'win32'
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
+
+if (!tempDirectory) {
+  let baseLocation
+
+  if (IS_WINDOWS) {
+    // On windows use the USERPROFILE env variable
+    baseLocation = process.env['USERPROFILE'] || 'C:\\'
+  } else if (process.platform === 'darwin') {
+    baseLocation = '/Users'
+  } else {
+    baseLocation = '/home'
+  }
+  tempDirectory = path.join(baseLocation, 'actions', 'temp')
+}
 
 export async function buildJDK(
   javaToBuild: string,
@@ -80,6 +95,7 @@ export async function buildJDK(
     --disable-adopt-branch-safety \
     ${javaToBuild}`)
   }
+
   // TODO: update directory for ubuntu
   // await printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
@@ -149,6 +165,19 @@ async function installDependencies(javaToBuild: string, impl: string): Promise<v
     await exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`)
     await exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`)
     await exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`)
+
+    if (`${impl}` === 'openj9') {
+      const cuda9 = await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run')
+      await exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`)
+      await io.rmRF(`${cuda9}`)
+      const opensslV = await tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz')
+      await tc.extractTar(`${opensslV}`, `${tempDirectory}`)
+      process.chdir(`${tempDirectory}/openssl-1.0.2r`)
+      await exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`)
+      await exec.exec(`sudo make`)
+      await exec.exec(`sudo make install`)
+      await io.rmRF(`${opensslV}`)
+    }
   }
   process.chdir(`${workDir}`)
   // other installation, i.e impl
@@ -170,15 +199,15 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     }
 
-    await exec.exec('ls')
     if (`${targetOs}` === 'mac') {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
+    } else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
     } else {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
     }
+
     await io.rmRF(`${bootjdkJar}`)
-    core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-    core.addPath(`${workDir}/jdk/boot/bin`)
   } else {
     //TODO : need to update
     const jdk8Jar = await tc.downloadTool('https://api.adoptopenjdk.net/v2/binary/releases/openjdk8?os=mac&release=latest&arch=x64&heap_size=normal&type=jdk&openjdk_impl=hotspot')

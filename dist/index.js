@@ -3175,13 +3175,29 @@ const exec = __importStar(__webpack_require__(986));
 const core = __importStar(__webpack_require__(470));
 const tc = __importStar(__webpack_require__(533));
 const io = __importStar(__webpack_require__(1));
+const path = __importStar(__webpack_require__(622));
+let tempDirectory = process.env['RUNNER_TEMP'] || '';
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`;
 //const javaHomeDir = `${workDir}/jdk/home`
 let buildDir = workDir;
-const IS_WINDOWS = process.platform === "win32";
+const IS_WINDOWS = process.platform === 'win32';
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
+if (!tempDirectory) {
+    let baseLocation;
+    if (IS_WINDOWS) {
+        // On windows use the USERPROFILE env variable
+        baseLocation = process.env['USERPROFILE'] || 'C:\\';
+    }
+    else if (process.platform === 'darwin') {
+        baseLocation = '/Users';
+    }
+    else {
+        baseLocation = '/home';
+    }
+    tempDirectory = path.join(baseLocation, 'actions', 'temp');
+}
 function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         yield getOpenjdkBuildResource(usePRRef);
@@ -3311,6 +3327,18 @@ function installDependencies(javaToBuild, impl) {
             yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
             yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
             yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
+            if (`${impl}` === 'openj9') {
+                const cuda9 = yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run');
+                yield exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`);
+                yield io.rmRF(`${cuda9}`);
+                const opensslV = yield tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz');
+                yield tc.extractTar(`${opensslV}`, `${tempDirectory}`);
+                process.chdir(`${tempDirectory}/openssl-1.0.2r`);
+                yield exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`);
+                yield exec.exec(`sudo make`);
+                yield exec.exec(`sudo make install`);
+                yield io.rmRF(`${opensslV}`);
+            }
         }
         process.chdir(`${workDir}`);
         // other installation, i.e impl
@@ -3330,16 +3358,16 @@ function getBootJdk(javaToBuild, impl) {
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
-            yield exec.exec('ls');
             if (`${targetOs}` === 'mac') {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            }
+            else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`); // TODO : issue open as this is packaged differently
             }
             else {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
             }
             yield io.rmRF(`${bootjdkJar}`);
-            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
-            core.addPath(`${workDir}/jdk/boot/bin`);
         }
         else {
             //TODO : need to update
