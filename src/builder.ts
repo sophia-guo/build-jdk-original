@@ -80,7 +80,7 @@ export async function buildJDK(
     --disable-adopt-branch-safety \
     ${javaToBuild}`)
   }
-  printJavaVersion(javaToBuild)
+  await printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
   await exec.exec(`find ./ -name ${fileName}.tar.gz`)
 }

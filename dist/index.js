@@ -3243,7 +3243,7 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     --disable-adopt-branch-safety \
     ${javaToBuild}`);
         }
-        printJavaVersion(javaToBuild);
+        yield printJavaVersion(javaToBuild);
         process.chdir(`${workDir}`);
         yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
     });
