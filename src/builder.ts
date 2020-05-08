@@ -80,9 +80,15 @@ export async function buildJDK(
     --disable-adopt-branch-safety \
     ${javaToBuild}`)
   }
-  await printJavaVersion(javaToBuild)
+  // TODO: update directory for ubuntu
+  // await printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
-  await exec.exec(`find ./ -name ${fileName}.tar.gz`)
+
+  try {
+    await exec.exec(`find ./ -name ${fileName}.tar.gz`)
+  } catch (error) {
+    core.setFailed(`build failed and ${error.message}`)
+  }
 }
 
 async function getOpenjdkBuildResource(usePPRef: Boolean): Promise<void> {

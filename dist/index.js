@@ -3243,9 +3243,15 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     --disable-adopt-branch-safety \
     ${javaToBuild}`);
         }
-        yield printJavaVersion(javaToBuild);
+        // TODO: update directory for ubuntu
+        // await printJavaVersion(javaToBuild)
         process.chdir(`${workDir}`);
-        yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
+        try {
+            yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
+        }
+        catch (error) {
+            core.setFailed(`build failed and ${error.message}`);
+        }
     });
 }
 exports.buildJDK = buildJDK;
