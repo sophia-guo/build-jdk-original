@@ -3175,6 +3175,8 @@ const exec = __importStar(__webpack_require__(986));
 const core = __importStar(__webpack_require__(470));
 const tc = __importStar(__webpack_require__(533));
 const io = __importStar(__webpack_require__(1));
+const path = __importStar(__webpack_require__(622));
+let tempDirectory = process.env["RUNNER_TEMP"] || "";
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`;
@@ -3182,6 +3184,20 @@ const jdkBootDir = `${workDir}/jdk/boot`;
 let buildDir = workDir;
 const IS_WINDOWS = process.platform === "win32";
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
+if (!tempDirectory) {
+    let baseLocation;
+    if (IS_WINDOWS) {
+        // On windows use the USERPROFILE env variable
+        baseLocation = process.env["USERPROFILE"] || "C:\\";
+    }
+    else if (process.platform === "darwin") {
+        baseLocation = "/Users";
+    }
+    else {
+        baseLocation = "/home";
+    }
+    tempDirectory = path.join(baseLocation, "actions", "temp");
+}
 function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         yield getOpenjdkBuildResource(usePRRef);
@@ -3319,6 +3335,13 @@ function installDependencies(javaToBuild, impl) {
                 const cuda9 = yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run');
                 yield exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`);
                 yield io.rmRF(`${cuda9}`);
+                const opensslV = yield tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz');
+                yield tc.extractTar(`${opensslV}`, `${tempDirectory}`);
+                process.chdir(`${tempDirectory}/openssl-1.0.2r`);
+                yield exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`);
+                yield exec.exec(`sudo make`);
+                yield exec.exec(`sudo make install`);
+                yield io.rmRF(`${opensslV}`);
             }
         }
         process.chdir(`${workDir}`);

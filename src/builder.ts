@@ -3,7 +3,9 @@ import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
 import { EXDEV } from 'constants'
+import * as path from "path"
 
+let tempDirectory = process.env["RUNNER_TEMP"] || "";
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
 const jdkBootDir = `${workDir}/jdk/boot`
@@ -11,6 +13,20 @@ const jdkBootDir = `${workDir}/jdk/boot`
 let buildDir = workDir as string
 const IS_WINDOWS = process.platform === "win32"
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
+
+if (!tempDirectory) {
+  let baseLocation;
+
+  if (IS_WINDOWS) {
+    // On windows use the USERPROFILE env variable
+    baseLocation = process.env["USERPROFILE"] || "C:\\";
+  } else if (process.platform === "darwin") {
+    baseLocation = "/Users"
+  } else {
+    baseLocation = "/home"
+  }
+  tempDirectory = path.join(baseLocation, "actions", "temp")
+}
 
 export async function buildJDK(
   javaToBuild: string,
@@ -155,6 +171,13 @@ async function installDependencies(javaToBuild: string, impl: string): Promise<v
       const cuda9 = await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run')
       await exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`)
       await io.rmRF(`${cuda9}`)
+      const opensslV = await tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz')
+      await tc.extractTar(`${opensslV}`, `${tempDirectory}`)
+      process.chdir(`${tempDirectory}/openssl-1.0.2r`)
+      await exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`)
+      await exec.exec(`sudo make`)
+      await exec.exec(`sudo make install`)
+      await io.rmRF(`${opensslV}`)
     }
   }
   process.chdir(`${workDir}`)
