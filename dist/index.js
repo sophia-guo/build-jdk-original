@@ -3315,6 +3315,11 @@ function installDependencies(javaToBuild, impl) {
             yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
             yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
             yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
+            if (`${impl}` === 'openj9') {
+                const cuda9 = yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run');
+                yield exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`);
+                yield io.rmRF(`${cuda9}`);
+            }
         }
         process.chdir(`${workDir}`);
         // other installation, i.e impl
