@@ -3339,21 +3339,20 @@ function getBootJdk(javaToBuild, impl) {
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
-            yield exec.exec('ls');
+            /*     await exec.exec('ls')
+                if (`${targetOs}` === 'mac') {
+                  await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
+                } else {
+                  await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
+                } */
             if (`${targetOs}` === 'mac') {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
             }
+            else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`); // TODO : issue open as this is packaged differently
+            }
             else {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
-            }
-            if (`${targetOs}` === 'mac') {
-                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=3`);
-            }
-            else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
-                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`); // TODO : issue open as this is packaged differently
-            }
-            else {
-                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`);
             }
             yield io.rmRF(`${bootjdkJar}`);
             //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH

@@ -177,19 +177,19 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     }
 
-    await exec.exec('ls')
+/*     await exec.exec('ls')
     if (`${targetOs}` === 'mac') {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
     } else {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
-    }
+    } */
 
     if (`${targetOs}` === 'mac') {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=3`)
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
     } else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`) // TODO : issue open as this is packaged differently
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
     } else {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`)
+      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
     }
 
     await io.rmRF(`${bootjdkJar}`)
