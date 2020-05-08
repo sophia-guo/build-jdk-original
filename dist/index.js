@@ -3186,6 +3186,7 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         yield getOpenjdkBuildResource(usePRRef);
         core.info(`build Dir is ${buildDir}`);
+        core.info(`current dir is ${process.cwd()}`);
         //set parameters and environment
         const time = new Date().toISOString().split('T')[0];
         const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`;
@@ -3194,25 +3195,63 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         yield io.mkdirP('boot');
         yield io.mkdirP('home');
         process.chdir(`${workDir}`);
+        yield exec.exec('ls');
+        core.info(`current path is ${process.cwd()}`);
         //pre-install dependencies
         yield installDependencies(javaToBuild, impl);
+        yield exec.exec('ls');
+        core.info(`current path is ${process.cwd()}`);
         yield getBootJdk(javaToBuild, impl);
+        yield exec.exec('ls');
+        core.info(`current path is ${process.cwd()}`);
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
-        yield exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
-  --disable-shallow-git-clone \
-  --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
-  -d artifacts \
-  --target-file-name ${fileName}.tar.gz  \
-  --use-jep319-certs \
-  --build-variant ${impl} \
-  --disable-adopt-branch-safety \
-  ${javaToBuild}`);
-        printJavaVersion(javaToBuild);
+        if (`${targetOs}` === 'mac') {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
+        else if (`${impl}` === 'hotspot') {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
+        else {
+            yield exec.exec(`./makejdk-any-platform.sh \
+    -J ${jdkBootDir} \
+    --disable-shallow-git-clone \
+    --configure-args "--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0" \
+    -d artifacts \
+    --target-file-name ${fileName}.tar.gz  \
+    --use-jep319-certs \
+    --build-variant ${impl} \
+    --disable-adopt-branch-safety \
+    ${javaToBuild}`);
+        }
+        // TODO: update directory for ubuntu
+        // await printJavaVersion(javaToBuild)
         process.chdir(`${workDir}`);
-        yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
+        try {
+            yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
+        }
+        catch (error) {
+            core.setFailed(`build failed and ${error.message}`);
+        }
     });
 }
 exports.buildJDK = buildJDK;
@@ -3234,6 +3273,46 @@ function installDependencies(javaToBuild, impl) {
                 yield exec.exec('brew install bash nasm');
             }
         }
+        else if (`${targetOs}` === 'linux') {
+            yield exec.exec(`sudo apt-get update`);
+            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
+      autoconf \
+      ccache \
+      cpio \
+      git-core \
+      build-essential \
+      libasound2-dev \
+      libcups2-dev \
+      libdwarf-dev \
+      libelf-dev \
+      libfontconfig1-dev \
+      libfreetype6-dev \
+      libnuma-dev \
+      libx11-dev \
+      libxext-dev \
+      libxrender-dev \
+      libxrandr-dev \
+      libxt-dev \
+      libxtst-dev \
+      make \
+      nasm \
+      pkg-config \
+      realpath \
+      ssh \
+      libnuma-dev \
+      numactl \
+      gcc-multilib');
+            process.chdir('/usr/local');
+            const gccBinary = yield tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`);
+            yield exec.exec(`ls -l ${gccBinary}`);
+            yield exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`);
+            yield io.rmRF(`${gccBinary}`);
+            yield exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`);
+            yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
+            yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
+            yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
+        }
+        process.chdir(`${workDir}`);
         // other installation, i.e impl
     });
 }
@@ -3243,15 +3322,23 @@ function getBootJdk(javaToBuild, impl) {
         if (parseInt(bootJDKVersion) > 8) {
             let bootjdkJar;
             // TODO: issue open openj9,mac, 10 ga : https://api.adoptopenjdk.net/v3/binary/latest/10/ga/mac/x64/jdk/openj9/normal/adoptopenjdk doesn't work
-            if (`${impl}` === 'openj9' && `${bootJDKVersion}` === '10' && `${targetOs} === 'mac'`) {
+            if (`${impl}` === 'openj9' &&
+                `${bootJDKVersion}` === '10' &&
+                `${targetOs}` === 'mac') {
                 bootjdkJar = yield tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`);
             }
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
-            yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            yield exec.exec('ls');
+            if (`${targetOs}` === 'mac') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
+            }
+            else {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
+            }
             yield io.rmRF(`${bootjdkJar}`);
-            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); //# Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
+            core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`); // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
             core.addPath(`${workDir}/jdk/boot/bin`);
         }
         else {
@@ -3294,7 +3381,7 @@ function printJavaVersion(javaToBuild) {
         else {
             let version = javaToBuild.replace('jdk', '');
             version = version.substr(0, version.length - 1);
-            if (parseInt(version) >= 14)
+            if (parseInt(version) >= 13)
                 platformRelease = `${platform}-x86_64-server-release`;
         }
         let jdkImages;

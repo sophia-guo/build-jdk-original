@@ -1,11 +1,10 @@
-name: "build-jdk-openj9 with adoptopenjdk openjdk-build"
+name: "build-jdk-openj9 with adoptopenjdk openjdk-build linux"
 on: # rebuild any PRs and main branch changes
-  pull_request:
   push:
 
 jobs:
   build:
-    runs-on: macos-10.15
+    runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v1
     - uses: ./
