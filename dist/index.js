@@ -3346,6 +3346,15 @@ function getBootJdk(javaToBuild, impl) {
             else {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
             }
+            if (`${targetOs}` === 'mac') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=3`);
+            }
+            else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`); // TODO : issue open as this is packaged differently
+            }
+            else {
+                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`);
+            }
             yield io.rmRF(`${bootjdkJar}`);
             //  core.exportVariable('JAVA_HOME', `${workDir}/jdk/boot`) // Set environment variable JAVA_HOME, and prepend ${JAVA_HOME}/bin to PATH
             // core.addPath(`${workDir}/jdk/boot/bin`)
