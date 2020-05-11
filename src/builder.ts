@@ -35,8 +35,6 @@ export async function buildJDK(
 ): Promise<void> {
 
   await getOpenjdkBuildResource(usePRRef)
-  core.info(`build Dir is ${buildDir}`)
-  core.info(`current dir is ${process.cwd()}`)
   //set parameters and environment
   const time = new Date().toISOString().split('T')[0]
   const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`
@@ -46,15 +44,10 @@ export async function buildJDK(
   await io.mkdirP('home')
   process.chdir(`${workDir}`)
   await exec.exec('ls')
-  core.info(`current path is ${process.cwd()}`)
 
   //pre-install dependencies
   await installDependencies(javaToBuild, impl)
-  await exec.exec('ls')
-  core.info(`current path is ${process.cwd()}`)
   await getBootJdk(javaToBuild, impl)
-  await exec.exec('ls')
-  core.info(`current path is ${process.cwd()}`)
   
   //got to build Dir
   process.chdir(`${buildDir}`)
@@ -81,7 +74,6 @@ export async function buildJDK(
   --build-variant ${impl} \
   --disable-adopt-branch-safety \
   ${javaToBuild}`)
-
 
   // TODO: update directory for ubuntu
   await printJavaVersion(javaToBuild)
@@ -239,6 +231,7 @@ async function printJavaVersion(javaToBuild: string): Promise<void> {
   process.chdir(`${jdkImages}`)
   core.info('images dir is ')
   await exec.exec('ls')
+  process.chdir(`${buildDir}`)
   const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`
   process.chdir(`${jdkdir}/bin`)
   await exec.exec(`./java -version`)

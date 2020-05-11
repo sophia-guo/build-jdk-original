@@ -3201,8 +3201,6 @@ if (!tempDirectory) {
 function buildJDK(javaToBuild, architecture, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         yield getOpenjdkBuildResource(usePRRef);
-        core.info(`build Dir is ${buildDir}`);
-        core.info(`current dir is ${process.cwd()}`);
         //set parameters and environment
         const time = new Date().toISOString().split('T')[0];
         const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`;
@@ -3212,14 +3210,9 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         yield io.mkdirP('home');
         process.chdir(`${workDir}`);
         yield exec.exec('ls');
-        core.info(`current path is ${process.cwd()}`);
         //pre-install dependencies
         yield installDependencies(javaToBuild, impl);
-        yield exec.exec('ls');
-        core.info(`current path is ${process.cwd()}`);
         yield getBootJdk(javaToBuild, impl);
-        yield exec.exec('ls');
-        core.info(`current path is ${process.cwd()}`);
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
@@ -3402,6 +3395,7 @@ function printJavaVersion(javaToBuild) {
         process.chdir(`${jdkImages}`);
         core.info('images dir is ');
         yield exec.exec('ls');
+        process.chdir(`${buildDir}`);
         const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`;
         process.chdir(`${jdkdir}/bin`);
         yield exec.exec(`./java -version`);
