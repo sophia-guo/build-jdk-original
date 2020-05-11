@@ -3399,6 +3399,7 @@ function printJavaVersion(javaToBuild) {
                 platformRelease = `${platform}-x86_64-server-release`;
         }
         const jdkImages = `workspace/build/src/build/${platformRelease}/images`;
+        process.chdir(`${jdkImages}`);
         core.info('images dir is ');
         yield exec.exec('ls');
         const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`;
