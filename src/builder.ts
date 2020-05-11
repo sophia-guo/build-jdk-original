@@ -60,44 +60,31 @@ export async function buildJDK(
   process.chdir(`${buildDir}`)
   
   //build
-
+  let configureArgs
   if (`${targetOs}` === 'mac') {
-    await exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`)
-  } else if (`${impl}` === 'hotspot'){
-    await exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`)
-  } else {
-    await exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`)
+    configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'"
+  } else if (`${targetOs}` === 'linux') {
+    if (`${impl}` === 'hotspot') {
+      configureArgs = '--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors'
+    } else {
+      configureArgs = '--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0'
+    }
   }
 
+  await exec.exec(`./makejdk-any-platform.sh \
+  -J ${jdkBootDir} \
+  --disable-shallow-git-clone \
+  --configure-args ${configureArgs} \
+  -d artifacts \
+  --target-file-name ${fileName}.tar.gz  \
+  --use-jep319-certs \
+  --build-variant ${impl} \
+  --disable-adopt-branch-safety \
+  ${javaToBuild}`)
+
+
   // TODO: update directory for ubuntu
-  // await printJavaVersion(javaToBuild)
+  await printJavaVersion(javaToBuild)
   process.chdir(`${workDir}`)
 
   try {
@@ -248,15 +235,19 @@ async function printJavaVersion(javaToBuild: string): Promise<void> {
     version = version.substr(0, version.length - 1)
     if (parseInt(version) >= 13) platformRelease = `${platform}-x86_64-server-release` 
   }
-  let jdkImages
-  if (javaToBuild === 'jdk8u') {
+  const jdkImages = `workspace/build/src/build/${platformRelease}/images`
+  core.info('images dir is ')
+  await exec.exec('ls')
+  const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`
+  process.chdir(`${jdkdir}/bin`)
+  await exec.exec(`./java -version`)
+/*   if (javaToBuild === 'jdk8u') {
     jdkImages = `workspace/build/src/build/${platformRelease}/images/j2sdk-image`
     process.chdir(`${jdkImages}/jre/bin`)
   } else {
     jdkImages = `workspace/build/src/build/${platformRelease}/images/jdk`
     process.chdir(`${jdkImages}/bin`)
-  }
-  await exec.exec(`./java -version`)
+  } */
   //set outputs
-  core.setOutput('BuildJDKDir', `${buildDir}/${jdkImages}`)
+  core.setOutput('BuildJDKDir', `${buildDir}/${jdkdir}`)
 }

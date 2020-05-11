@@ -3223,44 +3223,30 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
+        let configureArgs;
         if (`${targetOs}` === 'mac') {
-            yield exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`);
+            configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'";
         }
-        else if (`${impl}` === 'hotspot') {
-            yield exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`);
+        else if (`${targetOs}` === 'linux') {
+            if (`${impl}` === 'hotspot') {
+                configureArgs = '--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors';
+            }
+            else {
+                configureArgs = '--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0';
+            }
         }
-        else {
-            yield exec.exec(`./makejdk-any-platform.sh \
-    -J ${jdkBootDir} \
-    --disable-shallow-git-clone \
-    --configure-args "--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0" \
-    -d artifacts \
-    --target-file-name ${fileName}.tar.gz  \
-    --use-jep319-certs \
-    --build-variant ${impl} \
-    --disable-adopt-branch-safety \
-    ${javaToBuild}`);
-        }
+        yield exec.exec(`./makejdk-any-platform.sh \
+  -J ${jdkBootDir} \
+  --disable-shallow-git-clone \
+  --configure-args ${configureArgs} \
+  -d artifacts \
+  --target-file-name ${fileName}.tar.gz  \
+  --use-jep319-certs \
+  --build-variant ${impl} \
+  --disable-adopt-branch-safety \
+  ${javaToBuild}`);
         // TODO: update directory for ubuntu
-        // await printJavaVersion(javaToBuild)
+        yield printJavaVersion(javaToBuild);
         process.chdir(`${workDir}`);
         try {
             yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
@@ -3412,18 +3398,21 @@ function printJavaVersion(javaToBuild) {
             if (parseInt(version) >= 13)
                 platformRelease = `${platform}-x86_64-server-release`;
         }
-        let jdkImages;
-        if (javaToBuild === 'jdk8u') {
-            jdkImages = `workspace/build/src/build/${platformRelease}/images/j2sdk-image`;
-            process.chdir(`${jdkImages}/jre/bin`);
-        }
-        else {
-            jdkImages = `workspace/build/src/build/${platformRelease}/images/jdk`;
-            process.chdir(`${jdkImages}/bin`);
-        }
+        const jdkImages = `workspace/build/src/build/${platformRelease}/images`;
+        core.info('images dir is ');
+        yield exec.exec('ls');
+        const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`;
+        process.chdir(`${jdkdir}/bin`);
         yield exec.exec(`./java -version`);
+        /*   if (javaToBuild === 'jdk8u') {
+            jdkImages = `workspace/build/src/build/${platformRelease}/images/j2sdk-image`
+            process.chdir(`${jdkImages}/jre/bin`)
+          } else {
+            jdkImages = `workspace/build/src/build/${platformRelease}/images/jdk`
+            process.chdir(`${jdkImages}/bin`)
+          } */
         //set outputs
-        core.setOutput('BuildJDKDir', `${buildDir}/${jdkImages}`);
+        core.setOutput('BuildJDKDir', `${buildDir}/${jdkdir}`);
     });
 }
 
