@@ -3238,7 +3238,7 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         yield exec.exec(`./makejdk-any-platform.sh \
   -J ${jdkBootDir} \
   --disable-shallow-git-clone \
-  --configure-args ${configureArgs} \
+  --configure-args "${configureArgs}" \
   -d artifacts \
   --target-file-name ${fileName}.tar.gz  \
   --use-jep319-certs \
