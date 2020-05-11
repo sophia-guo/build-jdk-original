@@ -3391,10 +3391,6 @@ function printJavaVersion(javaToBuild) {
             if (parseInt(version) >= 13)
                 platformRelease = `${platform}-x86_64-server-release`;
         }
-        const jdkImages = `workspace/build/src/build/${platformRelease}/images`;
-        process.chdir(`${jdkImages}`);
-        core.info('images dir is ');
-        yield exec.exec('ls');
         process.chdir(`${buildDir}`);
         const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`;
         process.chdir(`${jdkdir}/bin`);

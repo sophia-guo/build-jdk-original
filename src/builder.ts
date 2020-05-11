@@ -227,10 +227,6 @@ async function printJavaVersion(javaToBuild: string): Promise<void> {
     version = version.substr(0, version.length - 1)
     if (parseInt(version) >= 13) platformRelease = `${platform}-x86_64-server-release` 
   }
-  const jdkImages = `workspace/build/src/build/${platformRelease}/images`
-  process.chdir(`${jdkImages}`)
-  core.info('images dir is ')
-  await exec.exec('ls')
   process.chdir(`${buildDir}`)
   const jdkdir = `workspace/build/src/build/${platformRelease}/jdk`
   process.chdir(`${jdkdir}/bin`)
