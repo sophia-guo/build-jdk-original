@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "TypeScript template action",
-  "main": "lib/build-jdk-hotspot.js",
+  "main": "lib/build-jdk.js",
   "scripts": {
     "build": "tsc",
     "format": "prettier --write **/*.ts",

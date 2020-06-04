@@ -34,7 +34,7 @@ module.exports =
 /******/ 	// the startup function
 /******/ 	function startup() {
 /******/ 		// Load entry module and return exports
-/******/ 		return __webpack_require__(538);
+/******/ 		return __webpack_require__(910);
 /******/ 	};
 /******/
 /******/ 	// run startup
@@ -3198,12 +3198,12 @@ if (!tempDirectory) {
     }
     tempDirectory = path.join(baseLocation, 'actions', 'temp');
 }
-function buildJDK(javaToBuild, architecture, impl, usePRRef) {
+function buildJDK(javaToBuild, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         yield getOpenjdkBuildResource(usePRRef);
         //set parameters and environment
         const time = new Date().toISOString().split('T')[0];
-        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`;
+        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`;
         yield io.mkdirP('jdk');
         process.chdir('jdk');
         yield io.mkdirP('boot');
@@ -3216,6 +3216,8 @@ function buildJDK(javaToBuild, architecture, impl, usePRRef) {
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
+        // workround of issue https://github.com/sophia-guo/build-jdk/issues/6
+        core.exportVariable('ARCHITECTURE', 'x64');
         let configureArgs;
         if (`${targetOs}` === 'mac') {
             configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'";
@@ -3260,69 +3262,105 @@ function getOpenjdkBuildResource(usePPRef) {
 }
 function installDependencies(javaToBuild, impl) {
     return __awaiter(this, void 0, void 0, function* () {
-        /* install common dependencies place holder */
-        // install based on OS
         if (`${targetOs}` === 'mac') {
-            yield exec.exec('brew install autoconf ccache coreutils');
-            if (`${impl}` === 'openj9') {
-                yield exec.exec('brew install bash nasm');
-            }
+            yield installMacDepends(javaToBuild, impl);
         }
         else if (`${targetOs}` === 'linux') {
-            yield exec.exec(`sudo apt-get update`);
-            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
-      autoconf \
-      ccache \
-      cpio \
-      git-core \
-      build-essential \
-      libasound2-dev \
-      libcups2-dev \
-      libdwarf-dev \
-      libelf-dev \
-      libfontconfig1-dev \
-      libfreetype6-dev \
-      libnuma-dev \
-      libx11-dev \
-      libxext-dev \
-      libxrender-dev \
-      libxrandr-dev \
-      libxt-dev \
-      libxtst-dev \
-      make \
-      nasm \
-      pkg-config \
-      realpath \
-      ssh \
-      libnuma-dev \
-      numactl \
-      gcc-multilib');
-            process.chdir('/usr/local');
-            const gccBinary = yield tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`);
-            yield exec.exec(`ls -l ${gccBinary}`);
-            yield exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`);
-            yield io.rmRF(`${gccBinary}`);
-            yield exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`);
-            yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
-            yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
-            yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
-            if (`${impl}` === 'openj9') {
-                const cuda9 = yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run');
-                yield exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`);
-                yield io.rmRF(`${cuda9}`);
-                const opensslV = yield tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz');
-                yield tc.extractTar(`${opensslV}`, `${tempDirectory}`);
-                process.chdir(`${tempDirectory}/openssl-1.0.2r`);
-                yield exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`);
-                yield exec.exec(`sudo make`);
-                yield exec.exec(`sudo make install`);
-                yield io.rmRF(`${opensslV}`);
-            }
+            yield installLinuxDepends(javaToBuild, impl);
         }
-        process.chdir(`${workDir}`);
-        // other installation, i.e impl
+        else {
+            yield installWindowsDepends(javaToBuild, impl);
+        }
+        yield installCommons();
     });
 }
+function installCommons() {
+    return __awaiter(this, void 0, void 0, function* () {
+        //TODO placeholder
+    });
+}
+function installMacDepends(javaToBuild, impl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        //TODO using jdk default on github action virtual machine, gnu-tar will not be necessary
+        yield exec.exec('brew install autoconf ccache coreutils gnu-tar');
+        core.addPath('/usr/local/opt/gnu-tar/libexec/gnubin');
+        core.info(`path is ${process.env['PATH']}`);
+        if (`${impl}` === 'openj9') {
+            yield exec.exec('brew install bash nasm');
+        }
+    });
+}
+function installWindowsDepends(javaToBuild, impl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        //TODO
+    });
+}
+function installLinuxDepends(javaToBuild, impl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const ubuntuVersion = yield getOsVersion();
+        if (`${ubuntuVersion}` === '16.04') {
+            yield exec.exec('sudo apt-get update');
+            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
+      python-software-properties \
+      realpath');
+        }
+        yield exec.exec('sudo apt-get update');
+        yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
+    software-properties-common \
+    autoconf \
+    cpio \
+    libasound2-dev \
+    libcups2-dev \
+    libelf-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libx11-dev \
+    libxext-dev \
+    libxrender-dev \
+    libxrandr-dev \
+    libxt-dev \
+    libxtst-dev \
+    make \
+    libnuma-dev \
+    gcc-multilib \
+    pkg-config');
+        if (javaToBuild === 'jdk8u') {
+            yield exec.exec('sudo add-apt-repository ppa:openjdk-r/ppa');
+            yield exec.exec(`sudo apt-get update`);
+            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends openjdk-7-jdk');
+        }
+        if (`${impl}` === 'openj9') {
+            yield exec.exec('sudo apt-get update');
+            yield exec.exec('sudo apt-get install -qq -y --no-install-recommends \
+      nasm \
+      libdwarf-dev \
+      ssh');
+            //install cuda9
+            const cuda9 = yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run');
+            yield exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`);
+            yield io.rmRF(`${cuda9}`);
+            const opensslV = yield tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz');
+            yield tc.extractTar(`${opensslV}`, `${tempDirectory}`);
+            process.chdir(`${tempDirectory}/openssl-1.0.2r`);
+            yield exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`);
+            yield exec.exec(`sudo make`);
+            yield exec.exec(`sudo make install`);
+            yield io.rmRF(`${opensslV}`);
+        }
+        yield io.rmRF(`/var/lib/apt/lists/*`);
+        process.chdir('/usr/local');
+        const gccBinary = yield tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`);
+        yield exec.exec(`ls -l ${gccBinary}`);
+        yield exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`);
+        yield io.rmRF(`${gccBinary}`);
+        yield exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`);
+        yield exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`);
+        yield exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`);
+        yield exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`);
+        process.chdir(`${workDir}`);
+    });
+}
+//TODO: side effects of using pre-installed jdk on github action virtual machine
 function getBootJdk(javaToBuild, impl) {
     return __awaiter(this, void 0, void 0, function* () {
         const bootJDKVersion = getBootJdkVersion(javaToBuild);
@@ -3404,6 +3442,34 @@ function printJavaVersion(javaToBuild) {
           } */
         //set outputs
         core.setOutput('BuildJDKDir', `${buildDir}/${jdkdir}`);
+    });
+}
+function getOsVersion() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let osVersion = '';
+        const options = {};
+        let myOutput = '';
+        options.listeners = {
+            stdout: (data) => {
+                myOutput += data.toString();
+            }
+        };
+        if (IS_WINDOWS) {
+            //TODO
+        }
+        else if (`${targetOs}` === 'mac') {
+            //TODO
+        }
+        else {
+            exec.exec(`lsb_release`, ['-r', '-s'], options);
+            if (myOutput.includes('16.04')) {
+                osVersion = '16.04';
+            }
+            else {
+                osVersion = '18.04';
+            }
+        }
+        return osVersion;
     });
 }
 
@@ -3914,49 +3980,6 @@ function _getGlobal(key, defaultValue) {
     return value !== undefined ? value : defaultValue;
 }
 //# sourceMappingURL=tool-cache.js.map
-
-/***/ }),
-
-/***/ 538:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const core = __importStar(__webpack_require__(470));
-const builder = __importStar(__webpack_require__(532));
-function run() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const javaToBuild = core.getInput('javaToBuild', { required: false });
-            const architecture = core.getInput('architecture', { required: false });
-            const impl = core.getInput('impl', { required: false });
-            const usePRRef = core.getInput('usePRRef') === 'true';
-            yield builder.buildJDK(javaToBuild, architecture, impl, usePRRef);
-        }
-        catch (error) {
-            core.setFailed(error.message);
-        }
-    });
-}
-run();
-
 
 /***/ }),
 
@@ -4791,6 +4814,48 @@ module.exports = v4;
 /***/ (function(module) {
 
 module.exports = require("url");
+
+/***/ }),
+
+/***/ 910:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const builder = __importStar(__webpack_require__(532));
+function run() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const javaToBuild = core.getInput('javaToBuild', { required: false });
+            const impl = core.getInput('impl', { required: false });
+            const usePRRef = core.getInput('usePRRef') === 'true';
+            yield builder.buildJDK(javaToBuild, impl, usePRRef);
+        }
+        catch (error) {
+            core.setFailed(error.message);
+        }
+    });
+}
+run();
+
 
 /***/ }),
 
