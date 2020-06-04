@@ -16,9 +16,9 @@ jobs:
     - uses: ./
       id: buildJDK
       with: 
-        javaToBuild: 'jdk13u'
+        javaToBuild: 'jdk14u'
     - run: ${{ steps.buildJDK.outputs.BuildJDKDir }}/bin/java -version
-    - uses: actions/upload-artifact@v2-preview
+    - uses: actions/upload-artifact@v2
       with:
         name: buildJDK
         path: ./**/artifacts/*.tar.gz/

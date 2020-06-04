@@ -15,7 +15,7 @@ jobs:
       with: 
         javaToBuild: 'jdk11u'
     - run: ${{ steps.buildOpenj9.outputs.BuildJDKDir }}/bin/java -version
-    - uses: actions/upload-artifact@v2-preview
+    - uses: actions/upload-artifact@v2
       with:
         name: JDK
         path: ./**/artifacts/*.tar.gz/

@@ -3,6 +3,7 @@ import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
 import * as path from 'path'
+import {ExecOptions} from '@actions/exec/lib/interfaces'
 
 let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
@@ -29,7 +30,6 @@ if (!tempDirectory) {
 
 export async function buildJDK(
   javaToBuild: string,
-  architecture: string,
   impl: string,
   usePRRef: boolean
 ): Promise<void> {
@@ -37,7 +37,7 @@ export async function buildJDK(
   await getOpenjdkBuildResource(usePRRef)
   //set parameters and environment
   const time = new Date().toISOString().split('T')[0]
-  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_${architecture}_${targetOs}_${impl}_${time}`
+  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`
   await io.mkdirP('jdk')
   process.chdir('jdk')
   await io.mkdirP('boot')
@@ -53,6 +53,8 @@ export async function buildJDK(
   process.chdir(`${buildDir}`)
   
   //build
+  // workround of issue https://github.com/sophia-guo/build-jdk/issues/6
+  core.exportVariable('ARCHITECTURE', 'x64')
   let configureArgs
   if (`${targetOs}` === 'mac') {
     configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'"
@@ -94,74 +96,113 @@ async function getOpenjdkBuildResource(usePPRef: Boolean): Promise<void> {
 }
 
 async function installDependencies(javaToBuild: string, impl: string): Promise<void> {
-  /* install common dependencies place holder */
-
-  // install based on OS
   if (`${targetOs}` === 'mac') {
-    await exec.exec('brew install autoconf ccache coreutils')
-    if (`${impl}` === 'openj9') {
-      await exec.exec('brew install bash nasm')
-    }
+    await installMacDepends(javaToBuild, impl)
   } else if (`${targetOs}` === 'linux') {
-    await exec.exec(`sudo apt-get update`)
-    await exec.exec(
-      'sudo apt-get install -qq -y --no-install-recommends \
-      autoconf \
-      ccache \
-      cpio \
-      git-core \
-      build-essential \
-      libasound2-dev \
-      libcups2-dev \
-      libdwarf-dev \
-      libelf-dev \
-      libfontconfig1-dev \
-      libfreetype6-dev \
-      libnuma-dev \
-      libx11-dev \
-      libxext-dev \
-      libxrender-dev \
-      libxrandr-dev \
-      libxt-dev \
-      libxtst-dev \
-      make \
-      nasm \
-      pkg-config \
-      realpath \
-      ssh \
-      libnuma-dev \
-      numactl \
-      gcc-multilib'
-    )
-
-    process.chdir('/usr/local')
-    const gccBinary = await tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`)
-    await exec.exec(`ls -l ${gccBinary}`)
-    await exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`)
-    await io.rmRF(`${gccBinary}`)
-  
-    await exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`)
-    await exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`)
-    await exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`)
-    await exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`)
-
-    if (`${impl}` === 'openj9') {
-      const cuda9 = await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run')
-      await exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`)
-      await io.rmRF(`${cuda9}`)
-      const opensslV = await tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz')
-      await tc.extractTar(`${opensslV}`, `${tempDirectory}`)
-      process.chdir(`${tempDirectory}/openssl-1.0.2r`)
-      await exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`)
-      await exec.exec(`sudo make`)
-      await exec.exec(`sudo make install`)
-      await io.rmRF(`${opensslV}`)
-    }
+    await installLinuxDepends(javaToBuild, impl)
+  } else {
+    await installWindowsDepends(javaToBuild, impl)
   }
-  process.chdir(`${workDir}`)
-  // other installation, i.e impl
+  await installCommons()
 }
 
+async function installCommons(): Promise<void> {
+  //TODO placeholder
+}
+
+async function installMacDepends(javaToBuild: string, impl: string): Promise<void> {
+  //TODO using jdk default on github action virtual machine, gnu-tar will not be necessary
+  await exec.exec('brew install autoconf ccache coreutils gnu-tar')
+  core.addPath('/usr/local/opt/gnu-tar/libexec/gnubin')
+  core.info(`path is ${process.env['PATH']}`)
+
+  if (`${impl}` === 'openj9') {
+    await exec.exec('brew install bash nasm')
+  }
+}
+
+async function installWindowsDepends(javaToBuild: string, impl: string): Promise<void> {
+  //TODO
+}
+
+async function installLinuxDepends(javaToBuild: string, impl: string): Promise<void> {
+  const ubuntuVersion = await getOsVersion()
+  if (`${ubuntuVersion}` === '16.04') {
+    await exec.exec('sudo apt-get update')
+    await exec.exec(
+      'sudo apt-get install -qq -y --no-install-recommends \
+      python-software-properties \
+      realpath'
+    )
+  } 
+
+  await exec.exec('sudo apt-get update')
+  await exec.exec(
+    'sudo apt-get install -qq -y --no-install-recommends \
+    software-properties-common \
+    autoconf \
+    cpio \
+    libasound2-dev \
+    libcups2-dev \
+    libelf-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libx11-dev \
+    libxext-dev \
+    libxrender-dev \
+    libxrandr-dev \
+    libxt-dev \
+    libxtst-dev \
+    make \
+    libnuma-dev \
+    gcc-multilib \
+    pkg-config'
+  )
+
+  if (javaToBuild === 'jdk8u') {
+    await exec.exec('sudo add-apt-repository ppa:openjdk-r/ppa')
+    await exec.exec(`sudo apt-get update`)
+    await exec.exec('sudo apt-get install -qq -y --no-install-recommends openjdk-7-jdk')
+  }
+
+  if (`${impl}` === 'openj9') {
+    await exec.exec('sudo apt-get update')
+    await exec.exec(
+      'sudo apt-get install -qq -y --no-install-recommends \
+      nasm \
+      libdwarf-dev \
+      ssh'
+    )
+
+    //install cuda9
+    const cuda9 = await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run')
+    await exec.exec(`sudo sh ${cuda9} --silent --toolkit --override`)
+    await io.rmRF(`${cuda9}`)
+   
+    const opensslV = await tc.downloadTool('https://www.openssl.org/source/old/1.0.2/openssl-1.0.2r.tar.gz')
+    await tc.extractTar(`${opensslV}`, `${tempDirectory}`)
+    process.chdir(`${tempDirectory}/openssl-1.0.2r`)
+    await exec.exec(`sudo ./config --prefix=/usr/local/openssl-1.0.2 shared`)
+    await exec.exec(`sudo make`)
+    await exec.exec(`sudo make install`)
+    await io.rmRF(`${opensslV}`)
+  }
+  await io.rmRF(`/var/lib/apt/lists/*`)
+
+  process.chdir('/usr/local')
+  const gccBinary = await tc.downloadTool(`https://ci.adoptopenjdk.net/userContent/gcc/gcc730+ccache.x86_64.tar.xz`)
+  await exec.exec(`ls -l ${gccBinary}`)
+  await exec.exec(`sudo tar -xJ --strip-components=1 -C /usr/local -f ${gccBinary}`)
+  await io.rmRF(`${gccBinary}`)
+
+  await exec.exec(`sudo ln -s /usr/lib/x86_64-linux-gnu /usr/lib64`)
+  await exec.exec(`sudo ln -s /usr/include/x86_64-linux-gnu/* /usr/local/include`)
+  await exec.exec(`sudo ln -sf /usr/local/bin/g++-7.3 /usr/bin/g++`)
+  await exec.exec(`sudo ln -sf /usr/local/bin/gcc-7.3 /usr/bin/gcc`)
+  process.chdir(`${workDir}`)
+}
+
+//TODO: side effects of using pre-installed jdk on github action virtual machine
 async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
   const bootJDKVersion = getBootJdkVersion(javaToBuild)
 
@@ -240,4 +281,29 @@ async function printJavaVersion(javaToBuild: string): Promise<void> {
   } */
   //set outputs
   core.setOutput('BuildJDKDir', `${buildDir}/${jdkdir}`)
+}
+
+async function getOsVersion(): Promise<string> {
+  let osVersion = ''
+  const options: ExecOptions = {}
+  let myOutput = ''
+  options.listeners = {
+    stdout: (data: Buffer) => {
+      myOutput += data.toString()
+    }
+  }
+
+  if (IS_WINDOWS) {
+    //TODO
+  } else if (`${targetOs}` === 'mac') {
+    //TODO
+  } else {
+    exec.exec(`lsb_release`, ['-r', '-s'], options)
+    if (myOutput.includes('16.04')) {
+      osVersion = '16.04'
+    } else {
+      osVersion = '18.04'
+    }
+  }
+  return osVersion
 }

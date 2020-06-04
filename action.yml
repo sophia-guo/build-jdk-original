@@ -5,8 +5,6 @@ inputs:
   javaToBuild:
     description: 'openjdk version'
     default: 'jdk11u'     ## jdk8u cannot be built on macOS 10.14 or 10.13
-  architecture:
-    default: 'x64'
   impl:
     default: 'hotspot'
   usePRRef:
