@@ -122,7 +122,47 @@ async function installMacDepends(javaToBuild: string, impl: string): Promise<voi
 }
 
 async function installWindowsDepends(javaToBuild: string, impl: string): Promise<void> {
-  //TODO
+  //install cgywin
+  await io.mkdirP('C:\\cygwin64')
+  await io.mkdirP('C:\\cygwin_packages')
+  await tc.downloadTool('https://cygwin.com/setup-x86_64.exe', 'C:\\temp\\cygwin.exe')
+  await exec.exec(`C:\\temp\\cygwin.exe  --packages wget,bsdtar,rsync,gnupg,git,autoconf,make,gcc-core,mingw64-x86_64-gcc-core,unzip,zip,cpio,curl,grep,perl --quiet-mode --download --local-install
+  --delete-orphans --site  https://mirrors.kernel.org/sourceware/cygwin/
+  --local-package-dir "C:\\cygwin_packages"
+  --root "C:\\cygwin64"`)
+  await exec.exec(`C:/cygwin64/bin/git config --system core.autocrlf false`)
+  core.addPath(`C:\\cygwin64\\bin`)
+
+  //freeMarker TODO comment out 
+  //await tc.downloadTool(`https://repo.maven.apache.org/maven2/freemarker/freemarker/2.3.8/freemarker-2.3.8.jar`, `${workDir}\\freemarker.jar`)
+
+  if (`${impl}` === 'openj9') {
+    //nasm
+    await io.mkdirP('C:\\nasm')
+    await tc.downloadTool(`https://www.nasm.us/pub/nasm/releasebuilds/2.13.03/win64/nasm-2.13.03-win64.zip`, 'C:\\temp\\nasm.zip')
+    await tc.extractZip('C:\\temp\\nasm.zip', 'C:\\nasm')
+    const nasmdir = path.join('C:\\nasm', fs.readdirSync('C:\\nasm')[0])
+    core.addPath(nasmdir)
+    await io.rmRF('C:\\temp\\nasm.zip')
+    //llvm
+    await tc.downloadTool('https://ci.adoptopenjdk.net/userContent/winansible/llvm-7.0.0-win64.zip', 'C:\\temp\\llvm.zip')
+    await tc.extractZip('C:\\temp\\llvm.zip', 'C:\\')
+    await io.rmRF('C:\\temp\\llvm.zip')
+    core.addPath('C:\\Program Files\\LLVM\\bin')
+    //cuda
+    await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/network_installers/cuda_9.0.176_win10_network-exe', 'C:\\temp\\cuda_9.0.176_win10_network-exe.exe')
+    await exec.exec(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe -s compiler_9.0 nvml_dev_9.0`)
+    await io.rmRF(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe`)
+    //openssl
+    await tc.downloadTool('https://www.openssl.org/source/openssl-1.1.1g.tar.gz', 'C:\\temp\\OpenSSL-1.1.1g.tar.gz')
+    await tc.extractTar('C:\\temp\\OpenSSL-1.1.1g.tar.gz', 'C:\\temp')
+ 
+    process.chdir('C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Auxiliary\\Build')
+    core.addPath('C:\\Strawberry\\perl\\bin')
+    childProcess.execSync(`.\\vcvarsall.bat AMD64 && cd C:\\temp\\OpenSSL-1.1.1g && perl C:\\temp\\OpenSSL-1.1.1g\\Configure VC-WIN64A --prefix=C:\\OpenSSL-1.1.1g-x86_64-VS2017 && nmake.exe install > C:\\temp\\openssl64-VS2017.log && nmake.exe -f makefile clean`)
+    await io.rmRF('C:\\temp\\OpenSSL-1.1.1g.tar.gz')
+    await io.rmRF(`C:\\temp\\OpenSSL-1.1.1g`)
+  }
 }
 
 async function installLinuxDepends(javaToBuild: string, impl: string): Promise<void> {
