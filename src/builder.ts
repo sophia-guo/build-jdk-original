@@ -10,9 +10,9 @@ import {ExecOptions} from '@actions/exec/lib/interfaces'
 let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
-const jdkBootDir = `${workDir}/jdk/boot`
+const jdkBootDir = `${workDir}\\jdk\\boot`
 //const javaHomeDir = `${workDir}/jdk/home`
-let buildDir = workDir as string
+const buildDir = `${workDir}/openjdk-build`
 const IS_WINDOWS = process.platform === 'win32'
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
 
@@ -35,8 +35,6 @@ export async function buildJDK(
   impl: string,
   usePRRef: boolean
 ): Promise<void> {
-
-  await getOpenjdkBuildResource(usePRRef)
   //set parameters and environment
   const time = new Date().toISOString().split('T')[0]
   const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`
@@ -45,12 +43,12 @@ export async function buildJDK(
   await io.mkdirP('boot')
   await io.mkdirP('home')
   process.chdir(`${workDir}`)
-  await exec.exec('ls')
 
   //pre-install dependencies
   await installDependencies(javaToBuild, impl)
   await getBootJdk(javaToBuild, impl)
   
+  await getOpenjdkBuildResource(usePRRef)
   //got to build Dir
   process.chdir(`${buildDir}`)
   
@@ -66,10 +64,16 @@ export async function buildJDK(
     } else {
       configureArgs = '--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0'
     }
+  } else {
+    if (`${impl}` === 'hotspot') {
+      configureArgs = "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors"
+    } else {
+      configureArgs = "--with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'"
+    }
   }
 
-  await exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
+  await exec.exec(`bash ./makejdk-any-platform.sh \
+  -J "${jdkBootDir}" \
   --disable-shallow-git-clone \
   --configure-args "${configureArgs}" \
   -d artifacts \
@@ -93,7 +97,6 @@ export async function buildJDK(
 async function getOpenjdkBuildResource(usePPRef: Boolean): Promise<void> {
   if (!usePPRef) {
     await exec.exec(`git clone --depth 1 https://github.com/AdoptOpenJDK/openjdk-build.git`)
-    buildDir = `${workDir}/openjdk-build`
   }
 }
 
@@ -164,6 +167,7 @@ async function installWindowsDepends(javaToBuild: string, impl: string): Promise
     childProcess.execSync(`.\\vcvarsall.bat AMD64 && cd C:\\temp\\OpenSSL-1.1.1g && perl C:\\temp\\OpenSSL-1.1.1g\\Configure VC-WIN64A --prefix=C:\\OpenSSL-1.1.1g-x86_64-VS2017 && nmake.exe install > C:\\temp\\openssl64-VS2017.log && nmake.exe -f makefile clean`)
     await io.rmRF('C:\\temp\\OpenSSL-1.1.1g.tar.gz')
     await io.rmRF(`C:\\temp\\OpenSSL-1.1.1g`)
+    process.chdir(`${workDir}`)
   }
 }
 
@@ -257,6 +261,12 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       `${targetOs}` === 'mac'
     ) {
       bootjdkJar = await tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`)
+    } else if ( 
+      `${impl}` === 'hotspot' &&
+      `${bootJDKVersion}` === '10' &&
+      IS_WINDOWS
+    ) {
+      bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/11/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     } else {
       bootjdkJar = await tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`)
     }
@@ -265,16 +275,19 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
     } else if (`${targetOs}` === 'linux') {
       if (`${bootJDKVersion}` === '10' && `${impl}` === 'openj9') {
-        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`) // TODO : issue open as this is packaged differently
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
       } else {
-        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`)
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
       }
     } else {
       // windows jdk is zip file
       const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000))
       await tc.extractZip(bootjdkJar, `${tempDir}`)
       const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
-      await exec.exec(`mv ${tempJDKDir}/* ${workDir}/bootjdk`)
+      await exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`)
+      await exec.exec(`ls ${jdkBootDir}`)
+      await exec.exec(`${jdkBootDir}/bin/java -version`)
+      await exec.exec(`${jdkBootDir}/bin/javac -version`)
     }
     await io.rmRF(`${bootjdkJar}`)
   } else {

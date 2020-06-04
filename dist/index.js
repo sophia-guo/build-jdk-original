@@ -3181,9 +3181,9 @@ const childProcess = __importStar(__webpack_require__(129));
 let tempDirectory = process.env['RUNNER_TEMP'] || '';
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
-const jdkBootDir = `${workDir}/jdk/boot`;
+const jdkBootDir = `${workDir}\\jdk\\boot`;
 //const javaHomeDir = `${workDir}/jdk/home`
-let buildDir = workDir;
+const buildDir = `${workDir}/openjdk-build`;
 const IS_WINDOWS = process.platform === 'win32';
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
 if (!tempDirectory) {
@@ -3202,7 +3202,6 @@ if (!tempDirectory) {
 }
 function buildJDK(javaToBuild, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield getOpenjdkBuildResource(usePRRef);
         //set parameters and environment
         const time = new Date().toISOString().split('T')[0];
         const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`;
@@ -3211,10 +3210,10 @@ function buildJDK(javaToBuild, impl, usePRRef) {
         yield io.mkdirP('boot');
         yield io.mkdirP('home');
         process.chdir(`${workDir}`);
-        yield exec.exec('ls');
         //pre-install dependencies
         yield installDependencies(javaToBuild, impl);
         yield getBootJdk(javaToBuild, impl);
+        yield getOpenjdkBuildResource(usePRRef);
         //got to build Dir
         process.chdir(`${buildDir}`);
         //build
@@ -3232,8 +3231,16 @@ function buildJDK(javaToBuild, impl, usePRRef) {
                 configureArgs = '--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0';
             }
         }
-        yield exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
+        else {
+            if (`${impl}` === 'hotspot') {
+                configureArgs = "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors";
+            }
+            else {
+                configureArgs = "--with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'";
+            }
+        }
+        yield exec.exec(`bash ./makejdk-any-platform.sh \
+  -J "${jdkBootDir}" \
   --disable-shallow-git-clone \
   --configure-args "${configureArgs}" \
   -d artifacts \
@@ -3258,7 +3265,6 @@ function getOpenjdkBuildResource(usePPRef) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!usePPRef) {
             yield exec.exec(`git clone --depth 1 https://github.com/AdoptOpenJDK/openjdk-build.git`);
-            buildDir = `${workDir}/openjdk-build`;
         }
     });
 }
@@ -3331,6 +3337,7 @@ function installWindowsDepends(javaToBuild, impl) {
             childProcess.execSync(`.\\vcvarsall.bat AMD64 && cd C:\\temp\\OpenSSL-1.1.1g && perl C:\\temp\\OpenSSL-1.1.1g\\Configure VC-WIN64A --prefix=C:\\OpenSSL-1.1.1g-x86_64-VS2017 && nmake.exe install > C:\\temp\\openssl64-VS2017.log && nmake.exe -f makefile clean`);
             yield io.rmRF('C:\\temp\\OpenSSL-1.1.1g.tar.gz');
             yield io.rmRF(`C:\\temp\\OpenSSL-1.1.1g`);
+            process.chdir(`${workDir}`);
         }
     });
 }
@@ -3411,6 +3418,11 @@ function getBootJdk(javaToBuild, impl) {
                 `${targetOs}` === 'mac') {
                 bootjdkJar = yield tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`);
             }
+            else if (`${impl}` === 'hotspot' &&
+                `${bootJDKVersion}` === '10' &&
+                IS_WINDOWS) {
+                bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/11/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
+            }
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
@@ -3419,10 +3431,10 @@ function getBootJdk(javaToBuild, impl) {
             }
             else if (`${targetOs}` === 'linux') {
                 if (`${bootJDKVersion}` === '10' && `${impl}` === 'openj9') {
-                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`); // TODO : issue open as this is packaged differently
+                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`); // TODO : issue open as this is packaged differently
                 }
                 else {
-                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`);
+                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
                 }
             }
             else {
@@ -3430,7 +3442,10 @@ function getBootJdk(javaToBuild, impl) {
                 const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000));
                 yield tc.extractZip(bootjdkJar, `${tempDir}`);
                 const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0]);
-                yield exec.exec(`mv ${tempJDKDir}/* ${workDir}/bootjdk`);
+                yield exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`);
+                yield exec.exec(`ls ${jdkBootDir}`);
+                yield exec.exec(`${jdkBootDir}/bin/java -version`);
+                yield exec.exec(`${jdkBootDir}/bin/javac -version`);
             }
             yield io.rmRF(`${bootjdkJar}`);
         }
