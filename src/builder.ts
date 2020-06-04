@@ -3,6 +3,8 @@ import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
 import * as path from 'path'
+import * as fs from 'fs'
+import * as childProcess from 'child_process'
 import {ExecOptions} from '@actions/exec/lib/interfaces'
 
 let tempDirectory = process.env['RUNNER_TEMP'] || ''
@@ -261,12 +263,19 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
 
     if (`${targetOs}` === 'mac') {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
-    } else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
+    } else if (`${targetOs}` === 'linux') {
+      if (`${bootJDKVersion}` === '10' && `${impl}` === 'openj9') {
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`) // TODO : issue open as this is packaged differently
+      } else {
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`)
+      }
     } else {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
+      // windows jdk is zip file
+      const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000))
+      await tc.extractZip(bootjdkJar, `${tempDir}`)
+      const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
+      await exec.exec(`mv ${tempJDKDir}/* ${workDir}/bootjdk`)
     }
-
     await io.rmRF(`${bootjdkJar}`)
   } else {
     //TODO : need to update
@@ -281,7 +290,7 @@ function getBootJdkVersion(javaToBuild: string): string {
 
   //latest jdk need update continually
   if (`${javaToBuild}` === 'jdk') {
-    bootJDKVersion = '14'
+    bootJDKVersion = '15'
   } else {
     bootJDKVersion = javaToBuild.replace('jdk', '')
     bootJDKVersion = bootJDKVersion.substr(0, bootJDKVersion.length - 1)

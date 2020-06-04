@@ -3176,6 +3176,8 @@ const core = __importStar(__webpack_require__(470));
 const tc = __importStar(__webpack_require__(533));
 const io = __importStar(__webpack_require__(1));
 const path = __importStar(__webpack_require__(622));
+const fs = __importStar(__webpack_require__(747));
+const childProcess = __importStar(__webpack_require__(129));
 let tempDirectory = process.env['RUNNER_TEMP'] || '';
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
@@ -3292,7 +3294,44 @@ function installMacDepends(javaToBuild, impl) {
 }
 function installWindowsDepends(javaToBuild, impl) {
     return __awaiter(this, void 0, void 0, function* () {
-        //TODO
+        //install cgywin
+        yield io.mkdirP('C:\\cygwin64');
+        yield io.mkdirP('C:\\cygwin_packages');
+        yield tc.downloadTool('https://cygwin.com/setup-x86_64.exe', 'C:\\temp\\cygwin.exe');
+        yield exec.exec(`C:\\temp\\cygwin.exe  --packages wget,bsdtar,rsync,gnupg,git,autoconf,make,gcc-core,mingw64-x86_64-gcc-core,unzip,zip,cpio,curl,grep,perl --quiet-mode --download --local-install
+  --delete-orphans --site  https://mirrors.kernel.org/sourceware/cygwin/
+  --local-package-dir "C:\\cygwin_packages"
+  --root "C:\\cygwin64"`);
+        yield exec.exec(`C:/cygwin64/bin/git config --system core.autocrlf false`);
+        core.addPath(`C:\\cygwin64\\bin`);
+        //freeMarker TODO comment out 
+        //await tc.downloadTool(`https://repo.maven.apache.org/maven2/freemarker/freemarker/2.3.8/freemarker-2.3.8.jar`, `${workDir}\\freemarker.jar`)
+        if (`${impl}` === 'openj9') {
+            //nasm
+            yield io.mkdirP('C:\\nasm');
+            yield tc.downloadTool(`https://www.nasm.us/pub/nasm/releasebuilds/2.13.03/win64/nasm-2.13.03-win64.zip`, 'C:\\temp\\nasm.zip');
+            yield tc.extractZip('C:\\temp\\nasm.zip', 'C:\\nasm');
+            const nasmdir = path.join('C:\\nasm', fs.readdirSync('C:\\nasm')[0]);
+            core.addPath(nasmdir);
+            yield io.rmRF('C:\\temp\\nasm.zip');
+            //llvm
+            yield tc.downloadTool('https://ci.adoptopenjdk.net/userContent/winansible/llvm-7.0.0-win64.zip', 'C:\\temp\\llvm.zip');
+            yield tc.extractZip('C:\\temp\\llvm.zip', 'C:\\');
+            yield io.rmRF('C:\\temp\\llvm.zip');
+            core.addPath('C:\\Program Files\\LLVM\\bin');
+            //cuda
+            yield tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/network_installers/cuda_9.0.176_win10_network-exe', 'C:\\temp\\cuda_9.0.176_win10_network-exe.exe');
+            yield exec.exec(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe -s compiler_9.0 nvml_dev_9.0`);
+            yield io.rmRF(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe`);
+            //openssl
+            yield tc.downloadTool('https://www.openssl.org/source/openssl-1.1.1g.tar.gz', 'C:\\temp\\OpenSSL-1.1.1g.tar.gz');
+            yield tc.extractTar('C:\\temp\\OpenSSL-1.1.1g.tar.gz', 'C:\\temp');
+            process.chdir('C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Auxiliary\\Build');
+            core.addPath('C:\\Strawberry\\perl\\bin');
+            childProcess.execSync(`.\\vcvarsall.bat AMD64 && cd C:\\temp\\OpenSSL-1.1.1g && perl C:\\temp\\OpenSSL-1.1.1g\\Configure VC-WIN64A --prefix=C:\\OpenSSL-1.1.1g-x86_64-VS2017 && nmake.exe install > C:\\temp\\openssl64-VS2017.log && nmake.exe -f makefile clean`);
+            yield io.rmRF('C:\\temp\\OpenSSL-1.1.1g.tar.gz');
+            yield io.rmRF(`C:\\temp\\OpenSSL-1.1.1g`);
+        }
     });
 }
 function installLinuxDepends(javaToBuild, impl) {
@@ -3378,11 +3417,20 @@ function getBootJdk(javaToBuild, impl) {
             if (`${targetOs}` === 'mac') {
                 yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`);
             }
-            else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
-                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`); // TODO : issue open as this is packaged differently
+            else if (`${targetOs}` === 'linux') {
+                if (`${bootJDKVersion}` === '10' && `${impl}` === 'openj9') {
+                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=2`); // TODO : issue open as this is packaged differently
+                }
+                else {
+                    yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./bootjdk --strip=1`);
+                }
             }
             else {
-                yield exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`);
+                // windows jdk is zip file
+                const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000));
+                yield tc.extractZip(bootjdkJar, `${tempDir}`);
+                const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0]);
+                yield exec.exec(`mv ${tempJDKDir}/* ${workDir}/bootjdk`);
             }
             yield io.rmRF(`${bootjdkJar}`);
         }
@@ -3398,7 +3446,7 @@ function getBootJdkVersion(javaToBuild) {
     let bootJDKVersion;
     //latest jdk need update continually
     if (`${javaToBuild}` === 'jdk') {
-        bootJDKVersion = '14';
+        bootJDKVersion = '15';
     }
     else {
         bootJDKVersion = javaToBuild.replace('jdk', '');
