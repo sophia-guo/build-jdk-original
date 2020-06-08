@@ -72,9 +72,14 @@ export async function buildJDK(
     }
   }
 
-  if (IS_WINDOWS && `${impl}` === 'hotspot') {
-    jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`
-  }
+  if (IS_WINDOWS) {
+    if (`${impl}` === 'hotspot') {
+      jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`
+    } else {
+      jdkBootDir = 'c:\\jdkboot'
+    }
+  } 
+
   await exec.exec(`bash ./makejdk-any-platform.sh \
   -J "${jdkBootDir}" \
   --disable-shallow-git-clone \
@@ -286,8 +291,11 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       await tc.extractZip(bootjdkJar, `${tempDir}`)
       const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
       await exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`)
+      process.chdir('c:\\')
+      await io.mkdirP('jdkboot')
+      await exec.exec(`mv ${tempJDKDir}/* c:\\jdkboot`)
       await exec.exec(`ls ${jdkBootDir}`)
-      await exec.exec(`${jdkBootDir}/bin/java -version`)
+      await exec.exec(`c:\\jdkboot\\bin\\java -version`)
       await exec.exec(`${jdkBootDir}/bin/javac -version`)
     }
     await io.rmRF(`${bootjdkJar}`)

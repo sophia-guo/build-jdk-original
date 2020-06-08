@@ -3239,8 +3239,13 @@ function buildJDK(javaToBuild, impl, usePRRef) {
                 configureArgs = "--with-freemarker-jar='c:/freemarker.jar' --with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'";
             }
         }
-        if (IS_WINDOWS && `${impl}` === 'hotspot') {
-            jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`;
+        if (IS_WINDOWS) {
+            if (`${impl}` === 'hotspot') {
+                jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`;
+            }
+            else {
+                jdkBootDir = 'c:\\jdkboot';
+            }
         }
         yield exec.exec(`bash ./makejdk-any-platform.sh \
   -J "${jdkBootDir}" \
@@ -3445,8 +3450,11 @@ function getBootJdk(javaToBuild, impl) {
                 yield tc.extractZip(bootjdkJar, `${tempDir}`);
                 const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0]);
                 yield exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`);
+                process.chdir('c:\\');
+                yield io.mkdirP('jdkboot');
+                yield exec.exec(`mv ${tempJDKDir}/* c:\\jdkboot`);
                 yield exec.exec(`ls ${jdkBootDir}`);
-                yield exec.exec(`${jdkBootDir}/bin/java -version`);
+                yield exec.exec(`c:\\jdkboot\\bin\\java -version`);
                 yield exec.exec(`${jdkBootDir}/bin/javac -version`);
             }
             yield io.rmRF(`${bootjdkJar}`);
