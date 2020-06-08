@@ -10,7 +10,7 @@ import {ExecOptions} from '@actions/exec/lib/interfaces'
 let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
-const jdkBootDir = `${workDir}\\jdk\\boot`
+let jdkBootDir = `${workDir}\\jdk\\boot`
 //const javaHomeDir = `${workDir}/jdk/home`
 const buildDir = `${workDir}/openjdk-build`
 const IS_WINDOWS = process.platform === 'win32'
@@ -68,10 +68,13 @@ export async function buildJDK(
     if (`${impl}` === 'hotspot') {
       configureArgs = "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors"
     } else {
-      configureArgs = "--with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'"
+      configureArgs = "--with-freemarker-jar='c:/freemarker.jar' --with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'"
     }
   }
 
+  if (IS_WINDOWS && `${impl}` === 'hotspot') {
+    jdkBootDir = process.env['JAVA_HOME_11_X64'] as string
+  }
   await exec.exec(`bash ./makejdk-any-platform.sh \
   -J "${jdkBootDir}" \
   --disable-shallow-git-clone \
@@ -138,10 +141,8 @@ async function installWindowsDepends(javaToBuild: string, impl: string): Promise
   await exec.exec(`C:/cygwin64/bin/git config --system core.autocrlf false`)
   core.addPath(`C:\\cygwin64\\bin`)
 
-  //freeMarker TODO comment out 
-  //await tc.downloadTool(`https://repo.maven.apache.org/maven2/freemarker/freemarker/2.3.8/freemarker-2.3.8.jar`, `${workDir}\\freemarker.jar`)
-
   if (`${impl}` === 'openj9') {
+    await tc.downloadTool(`https://repo.maven.apache.org/maven2/freemarker/freemarker/2.3.8/freemarker-2.3.8.jar`, 'c:\\freemarker.jar')
     //nasm
     await io.mkdirP('C:\\nasm')
     await tc.downloadTool(`https://www.nasm.us/pub/nasm/releasebuilds/2.13.03/win64/nasm-2.13.03-win64.zip`, 'C:\\temp\\nasm.zip')
