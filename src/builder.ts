@@ -11,7 +11,6 @@ let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
 let jdkBootDir = `${workDir}\\jdk\\boot`
-//const javaHomeDir = `${workDir}/jdk/home`
 const buildDir = `${workDir}/openjdk-build`
 const IS_WINDOWS = process.platform === 'win32'
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
@@ -73,11 +72,7 @@ export async function buildJDK(
   }
 
   if (IS_WINDOWS) {
-    if (`${impl}` === 'hotspot') {
-      jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`
-    } else {
-      jdkBootDir = 'c:/jdkboot'
-    }
+    jdkBootDir = 'c:/jdkboot'
   } 
 
   await exec.exec(`bash ./makejdk-any-platform.sh \
@@ -290,14 +285,10 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000))
       await tc.extractZip(bootjdkJar, `${tempDir}`)
       const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
-      //await exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`)
       process.chdir('c:\\')
       await io.mkdirP('jdkboot')
       await exec.exec(`mv ${tempJDKDir}/* c:\\jdkboot`)
-     // await exec.exec(`ls ${jdkBootDir}`)
-      await exec.exec(`c:\\jdkboot\\bin\\java -version`)
-     // await exec.exec(`${jdkBootDir}/bin/javac -version`)
-     process.chdir(`${workDir}`)
+      process.chdir(`${workDir}`)
     }
     await io.rmRF(`${bootjdkJar}`)
   } else {
