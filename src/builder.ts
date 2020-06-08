@@ -290,13 +290,13 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
       const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000))
       await tc.extractZip(bootjdkJar, `${tempDir}`)
       const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
-      await exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`)
+      //await exec.exec(`mv ${tempJDKDir}/* ${jdkBootDir}`)
       process.chdir('c:\\')
       await io.mkdirP('jdkboot')
       await exec.exec(`mv ${tempJDKDir}/* c:\\jdkboot`)
-      await exec.exec(`ls ${jdkBootDir}`)
+     // await exec.exec(`ls ${jdkBootDir}`)
       await exec.exec(`c:\\jdkboot\\bin\\java -version`)
-      await exec.exec(`${jdkBootDir}/bin/javac -version`)
+     // await exec.exec(`${jdkBootDir}/bin/javac -version`)
     }
     await io.rmRF(`${bootjdkJar}`)
   } else {
