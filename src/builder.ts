@@ -76,12 +76,12 @@ export async function buildJDK(
     if (`${impl}` === 'hotspot') {
       jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`
     } else {
-      jdkBootDir = 'c:\\jdkboot'
+      jdkBootDir = 'c:/jdkboot'
     }
   } 
 
   await exec.exec(`bash ./makejdk-any-platform.sh \
-  -J "${jdkBootDir}" \
+  -J '${jdkBootDir}' \
   --disable-shallow-git-clone \
   --configure-args "${configureArgs}" \
   -d artifacts \

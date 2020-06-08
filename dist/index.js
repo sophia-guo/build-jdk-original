@@ -3244,11 +3244,11 @@ function buildJDK(javaToBuild, impl, usePRRef) {
                 jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`;
             }
             else {
-                jdkBootDir = 'c:\\jdkboot';
+                jdkBootDir = 'c:/jdkboot';
             }
         }
         yield exec.exec(`bash ./makejdk-any-platform.sh \
-  -J "${jdkBootDir}" \
+  -J '${jdkBootDir}' \
   --disable-shallow-git-clone \
   --configure-args "${configureArgs}" \
   -d artifacts \
