@@ -3456,6 +3456,7 @@ function getBootJdk(javaToBuild, impl) {
                 // await exec.exec(`ls ${jdkBootDir}`)
                 yield exec.exec(`c:\\jdkboot\\bin\\java -version`);
                 // await exec.exec(`${jdkBootDir}/bin/javac -version`)
+                process.chdir(`${workDir}`);
             }
             yield io.rmRF(`${bootjdkJar}`);
         }

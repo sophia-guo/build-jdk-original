@@ -297,6 +297,7 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
      // await exec.exec(`ls ${jdkBootDir}`)
       await exec.exec(`c:\\jdkboot\\bin\\java -version`)
      // await exec.exec(`${jdkBootDir}/bin/javac -version`)
+     process.chdir(`${workDir}`)
     }
     await io.rmRF(`${bootjdkJar}`)
   } else {
