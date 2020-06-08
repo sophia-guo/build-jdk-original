@@ -3240,7 +3240,7 @@ function buildJDK(javaToBuild, impl, usePRRef) {
             }
         }
         if (IS_WINDOWS && `${impl}` === 'hotspot') {
-            jdkBootDir = process.env['JAVA_HOME_11_X64'];
+            jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`;
         }
         yield exec.exec(`bash ./makejdk-any-platform.sh \
   -J "${jdkBootDir}" \

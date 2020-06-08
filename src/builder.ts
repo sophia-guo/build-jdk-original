@@ -73,7 +73,7 @@ export async function buildJDK(
   }
 
   if (IS_WINDOWS && `${impl}` === 'hotspot') {
-    jdkBootDir = process.env['JAVA_HOME_11_X64'] as string
+    jdkBootDir = `${process.env['JAVA_HOME_11_X64']}`
   }
   await exec.exec(`bash ./makejdk-any-platform.sh \
   -J "${jdkBootDir}" \
