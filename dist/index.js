@@ -3181,7 +3181,6 @@ const childProcess = __importStar(__webpack_require__(129));
 let tempDirectory = process.env['RUNNER_TEMP'] || '';
 const workDir = process.env['GITHUB_WORKSPACE'];
 //const dependenciesDir =  `${workDir}/tmp`
-let jdkBootDir = `${workDir}\\jdk\\boot`;
 const buildDir = `${workDir}/openjdk-build`;
 const IS_WINDOWS = process.platform === 'win32';
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
@@ -3203,7 +3202,6 @@ function buildJDK(javaToBuild, impl, usePRRef) {
     return __awaiter(this, void 0, void 0, function* () {
         //set parameters and environment
         const time = new Date().toISOString().split('T')[0];
-        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`;
         yield io.mkdirP('jdk');
         process.chdir('jdk');
         yield io.mkdirP('boot');
@@ -3219,6 +3217,9 @@ function buildJDK(javaToBuild, impl, usePRRef) {
         // workround of issue https://github.com/sophia-guo/build-jdk/issues/6
         core.exportVariable('ARCHITECTURE', 'x64');
         let configureArgs;
+        let jdkBootDir = `${workDir}/jdk/boot`;
+        const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`;
+        let fullFileName = `${fileName}.tar.gz`;
         if (`${targetOs}` === 'mac') {
             configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'";
         }
@@ -3237,16 +3238,14 @@ function buildJDK(javaToBuild, impl, usePRRef) {
             else {
                 configureArgs = "--with-freemarker-jar='c:/freemarker.jar' --with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'";
             }
-        }
-        if (IS_WINDOWS) {
             jdkBootDir = 'c:/jdkboot';
+            fullFileName = `${fileName}.zip`;
         }
         yield exec.exec(`bash ./makejdk-any-platform.sh \
   -J '${jdkBootDir}' \
-  --disable-shallow-git-clone \
   --configure-args "${configureArgs}" \
   -d artifacts \
-  --target-file-name ${fileName}.tar.gz  \
+  --target-file-name ${fullFileName} \
   --use-jep319-certs \
   --build-variant ${impl} \
   --disable-adopt-branch-safety \
@@ -3255,7 +3254,7 @@ function buildJDK(javaToBuild, impl, usePRRef) {
         yield printJavaVersion(javaToBuild);
         process.chdir(`${workDir}`);
         try {
-            yield exec.exec(`find ./ -name ${fileName}.tar.gz`);
+            yield exec.exec(`find ./ -name ${fullFileName}`);
         }
         catch (error) {
             core.setFailed(`build failed and ${error.message}`);
@@ -3418,11 +3417,6 @@ function getBootJdk(javaToBuild, impl) {
                 `${bootJDKVersion}` === '10' &&
                 `${targetOs}` === 'mac') {
                 bootjdkJar = yield tc.downloadTool(`https://github.com/AdoptOpenJDK/openjdk10-binaries/releases/download/jdk-10.0.2%2B13.1/OpenJDK10U-jdk_x64_mac_hotspot_10.0.2_13.tar.gz`);
-            }
-            else if (`${impl}` === 'hotspot' &&
-                `${bootJDKVersion}` === '10' &&
-                IS_WINDOWS) {
-                bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/11/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
             }
             else {
                 bootjdkJar = yield tc.downloadTool(`https://api.adoptopenjdk.net/v3/binary/latest/${bootJDKVersion}/ga/${targetOs}/x64/jdk/${impl}/normal/adoptopenjdk`);
