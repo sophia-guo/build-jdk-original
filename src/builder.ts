@@ -3,14 +3,14 @@ import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache'
 import * as io from '@actions/io'
 import * as path from 'path'
+import * as fs from 'fs'
+import * as childProcess from 'child_process'
 import {ExecOptions} from '@actions/exec/lib/interfaces'
 
 let tempDirectory = process.env['RUNNER_TEMP'] || ''
 const workDir = process.env['GITHUB_WORKSPACE']
 //const dependenciesDir =  `${workDir}/tmp`
-const jdkBootDir = `${workDir}/jdk/boot`
-//const javaHomeDir = `${workDir}/jdk/home`
-let buildDir = workDir as string
+const buildDir = `${workDir}/openjdk-build`
 const IS_WINDOWS = process.platform === 'win32'
 const targetOs = IS_WINDOWS ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
 
@@ -33,22 +33,19 @@ export async function buildJDK(
   impl: string,
   usePRRef: boolean
 ): Promise<void> {
-
-  await getOpenjdkBuildResource(usePRRef)
   //set parameters and environment
   const time = new Date().toISOString().split('T')[0]
-  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`
   await io.mkdirP('jdk')
   process.chdir('jdk')
   await io.mkdirP('boot')
   await io.mkdirP('home')
   process.chdir(`${workDir}`)
-  await exec.exec('ls')
 
   //pre-install dependencies
   await installDependencies(javaToBuild, impl)
   await getBootJdk(javaToBuild, impl)
   
+  await getOpenjdkBuildResource(usePRRef)
   //got to build Dir
   process.chdir(`${buildDir}`)
   
@@ -56,6 +53,9 @@ export async function buildJDK(
   // workround of issue https://github.com/sophia-guo/build-jdk/issues/6
   core.exportVariable('ARCHITECTURE', 'x64')
   let configureArgs
+  let jdkBootDir = `${workDir}/jdk/boot`
+  const fileName = `Open${javaToBuild.toUpperCase()}-jdk_x64_${targetOs}_${impl}_${time}`
+  let fullFileName = `${fileName}.tar.gz`
   if (`${targetOs}` === 'mac') {
     configureArgs = "--disable-warnings-as-errors --with-extra-cxxflags='-stdlib=libc++ -mmacosx-version-min=10.8'"
   } else if (`${targetOs}` === 'linux') {
@@ -64,14 +64,21 @@ export async function buildJDK(
     } else {
       configureArgs = '--disable-ccache --enable-jitserver --enable-dtrace=auto --disable-warnings-as-errors --with-openssl=/usr/local/openssl-1.0.2 --enable-cuda --with-cuda=/usr/local/cuda-9.0'
     }
+  } else {
+    if (`${impl}` === 'hotspot') {
+      configureArgs = "--disable-ccache --enable-dtrace=auto --disable-warnings-as-errors"
+    } else {
+      configureArgs = "--with-freemarker-jar='c:/freemarker.jar' --with-openssl='c:/OpenSSL-1.1.1g-x86_64-VS2017' --enable-openssl-bundling --enable-cuda -with-cuda='C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0'"
+    }
+    jdkBootDir = 'c:/jdkboot'
+    fullFileName = `${fileName}.zip`
   }
 
-  await exec.exec(`./makejdk-any-platform.sh \
-  -J ${jdkBootDir} \
-  --disable-shallow-git-clone \
+  await exec.exec(`bash ./makejdk-any-platform.sh \
+  -J '${jdkBootDir}' \
   --configure-args "${configureArgs}" \
   -d artifacts \
-  --target-file-name ${fileName}.tar.gz  \
+  --target-file-name ${fullFileName} \
   --use-jep319-certs \
   --build-variant ${impl} \
   --disable-adopt-branch-safety \
@@ -82,7 +89,7 @@ export async function buildJDK(
   process.chdir(`${workDir}`)
 
   try {
-    await exec.exec(`find ./ -name ${fileName}.tar.gz`)
+    await exec.exec(`find ./ -name ${fullFileName}`)
   } catch (error) {
     core.setFailed(`build failed and ${error.message}`)
   }
@@ -91,7 +98,6 @@ export async function buildJDK(
 async function getOpenjdkBuildResource(usePPRef: Boolean): Promise<void> {
   if (!usePPRef) {
     await exec.exec(`git clone --depth 1 https://github.com/AdoptOpenJDK/openjdk-build.git`)
-    buildDir = `${workDir}/openjdk-build`
   }
 }
 
@@ -122,7 +128,46 @@ async function installMacDepends(javaToBuild: string, impl: string): Promise<voi
 }
 
 async function installWindowsDepends(javaToBuild: string, impl: string): Promise<void> {
-  //TODO
+  //install cgywin
+  await io.mkdirP('C:\\cygwin64')
+  await io.mkdirP('C:\\cygwin_packages')
+  await tc.downloadTool('https://cygwin.com/setup-x86_64.exe', 'C:\\temp\\cygwin.exe')
+  await exec.exec(`C:\\temp\\cygwin.exe  --packages wget,bsdtar,rsync,gnupg,git,autoconf,make,gcc-core,mingw64-x86_64-gcc-core,unzip,zip,cpio,curl,grep,perl --quiet-mode --download --local-install
+  --delete-orphans --site  https://mirrors.kernel.org/sourceware/cygwin/
+  --local-package-dir "C:\\cygwin_packages"
+  --root "C:\\cygwin64"`)
+  await exec.exec(`C:/cygwin64/bin/git config --system core.autocrlf false`)
+  core.addPath(`C:\\cygwin64\\bin`)
+
+  if (`${impl}` === 'openj9') {
+    await tc.downloadTool(`https://repo.maven.apache.org/maven2/freemarker/freemarker/2.3.8/freemarker-2.3.8.jar`, 'c:\\freemarker.jar')
+    //nasm
+    await io.mkdirP('C:\\nasm')
+    await tc.downloadTool(`https://www.nasm.us/pub/nasm/releasebuilds/2.13.03/win64/nasm-2.13.03-win64.zip`, 'C:\\temp\\nasm.zip')
+    await tc.extractZip('C:\\temp\\nasm.zip', 'C:\\nasm')
+    const nasmdir = path.join('C:\\nasm', fs.readdirSync('C:\\nasm')[0])
+    core.addPath(nasmdir)
+    await io.rmRF('C:\\temp\\nasm.zip')
+    //llvm
+    await tc.downloadTool('https://ci.adoptopenjdk.net/userContent/winansible/llvm-7.0.0-win64.zip', 'C:\\temp\\llvm.zip')
+    await tc.extractZip('C:\\temp\\llvm.zip', 'C:\\')
+    await io.rmRF('C:\\temp\\llvm.zip')
+    core.addPath('C:\\Program Files\\LLVM\\bin')
+    //cuda
+    await tc.downloadTool('https://developer.nvidia.com/compute/cuda/9.0/Prod/network_installers/cuda_9.0.176_win10_network-exe', 'C:\\temp\\cuda_9.0.176_win10_network-exe.exe')
+    await exec.exec(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe -s compiler_9.0 nvml_dev_9.0`)
+    await io.rmRF(`C:\\temp\\cuda_9.0.176_win10_network-exe.exe`)
+    //openssl
+    await tc.downloadTool('https://www.openssl.org/source/openssl-1.1.1g.tar.gz', 'C:\\temp\\OpenSSL-1.1.1g.tar.gz')
+    await tc.extractTar('C:\\temp\\OpenSSL-1.1.1g.tar.gz', 'C:\\temp')
+ 
+    process.chdir('C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Auxiliary\\Build')
+    core.addPath('C:\\Strawberry\\perl\\bin')
+    childProcess.execSync(`.\\vcvarsall.bat AMD64 && cd C:\\temp\\OpenSSL-1.1.1g && perl C:\\temp\\OpenSSL-1.1.1g\\Configure VC-WIN64A --prefix=C:\\OpenSSL-1.1.1g-x86_64-VS2017 && nmake.exe install > C:\\temp\\openssl64-VS2017.log && nmake.exe -f makefile clean`)
+    await io.rmRF('C:\\temp\\OpenSSL-1.1.1g.tar.gz')
+    await io.rmRF(`C:\\temp\\OpenSSL-1.1.1g`)
+    process.chdir(`${workDir}`)
+  }
 }
 
 async function installLinuxDepends(javaToBuild: string, impl: string): Promise<void> {
@@ -221,12 +266,22 @@ async function getBootJdk(javaToBuild: string, impl: string): Promise<void> {
 
     if (`${targetOs}` === 'mac') {
       await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=3`)
-    } else if (`${bootJDKVersion}` === '10' && `${targetOs}` === 'linux' && `${impl}` === 'openj9') {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
+    } else if (`${targetOs}` === 'linux') {
+      if (`${bootJDKVersion}` === '10' && `${impl}` === 'openj9') {
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=2`) // TODO : issue open as this is packaged differently
+      } else {
+        await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
+      }
     } else {
-      await exec.exec(`sudo tar -xzf ${bootjdkJar} -C ./jdk/boot --strip=1`)
+      // windows jdk is zip file
+      const tempDir = path.join(tempDirectory, 'temp_' + Math.floor(Math.random() * 2000000000))
+      await tc.extractZip(bootjdkJar, `${tempDir}`)
+      const tempJDKDir = path.join(tempDir, fs.readdirSync(tempDir)[0])
+      process.chdir('c:\\')
+      await io.mkdirP('jdkboot')
+      await exec.exec(`mv ${tempJDKDir}/* c:\\jdkboot`)
+      process.chdir(`${workDir}`)
     }
-
     await io.rmRF(`${bootjdkJar}`)
   } else {
     //TODO : need to update
@@ -241,7 +296,7 @@ function getBootJdkVersion(javaToBuild: string): string {
 
   //latest jdk need update continually
   if (`${javaToBuild}` === 'jdk') {
-    bootJDKVersion = '14'
+    bootJDKVersion = '15'
   } else {
     bootJDKVersion = javaToBuild.replace('jdk', '')
     bootJDKVersion = bootJDKVersion.substr(0, bootJDKVersion.length - 1)
